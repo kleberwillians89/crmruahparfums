@@ -10,6 +10,7 @@
   "impossibleRows": 34,
   "operationalRows": 15,
   "operationalValue": 2256.2,
+  "columnGrossValue": 1673690.78,
   "possibleClientDuplicateGroups": 1,
   "uniqueClients": 418,
   "rowsWithClient": 5925,
@@ -19,10 +20,256 @@
   "normalizedClientNames": 418,
   "importedValue": 1669948.58,
   "revenue": 1652810.18,
+  "grossToDashboardDifference": 20880.6,
   "paid": 1561552.38,
   "pending": 91257.8,
   "cancelled": 5159,
   "reviewValue": 11979.4,
+  "rejectionReasonCounts": {
+    "missing_client": 1,
+    "invalid_amount": 18,
+    "operational_label": 15
+  },
+  "rejectedRows": [
+    {
+      "row": 65,
+      "reasons": [
+        "invalid_amount"
+      ],
+      "value": null
+    },
+    {
+      "row": 97,
+      "reasons": [
+        "invalid_amount"
+      ],
+      "value": null
+    },
+    {
+      "row": 174,
+      "reasons": [
+        "invalid_amount"
+      ],
+      "value": null
+    },
+    {
+      "row": 210,
+      "reasons": [
+        "invalid_amount"
+      ],
+      "value": null
+    },
+    {
+      "row": 234,
+      "reasons": [
+        "invalid_amount"
+      ],
+      "value": null
+    },
+    {
+      "row": 260,
+      "reasons": [
+        "invalid_amount"
+      ],
+      "value": null
+    },
+    {
+      "row": 261,
+      "reasons": [
+        "invalid_amount"
+      ],
+      "value": null
+    },
+    {
+      "row": 302,
+      "reasons": [
+        "invalid_amount"
+      ],
+      "value": null
+    },
+    {
+      "row": 312,
+      "reasons": [
+        "invalid_amount"
+      ],
+      "value": null
+    },
+    {
+      "row": 341,
+      "reasons": [
+        "invalid_amount"
+      ],
+      "value": null
+    },
+    {
+      "row": 350,
+      "reasons": [
+        "invalid_amount"
+      ],
+      "value": null
+    },
+    {
+      "row": 365,
+      "reasons": [
+        "invalid_amount"
+      ],
+      "value": null
+    },
+    {
+      "row": 388,
+      "reasons": [
+        "invalid_amount"
+      ],
+      "value": null
+    },
+    {
+      "row": 419,
+      "reasons": [
+        "invalid_amount"
+      ],
+      "value": null
+    },
+    {
+      "row": 436,
+      "reasons": [
+        "invalid_amount"
+      ],
+      "value": null
+    },
+    {
+      "row": 471,
+      "reasons": [
+        "invalid_amount"
+      ],
+      "value": null
+    },
+    {
+      "row": 478,
+      "reasons": [
+        "invalid_amount"
+      ],
+      "value": null
+    },
+    {
+      "row": 1188,
+      "reasons": [
+        "invalid_amount"
+      ],
+      "value": null
+    },
+    {
+      "row": 2073,
+      "reasons": [
+        "operational_label"
+      ],
+      "value": 247.8
+    },
+    {
+      "row": 2402,
+      "reasons": [
+        "operational_label"
+      ],
+      "value": 211.3
+    },
+    {
+      "row": 3092,
+      "reasons": [
+        "operational_label"
+      ],
+      "value": 153.5
+    },
+    {
+      "row": 3659,
+      "reasons": [
+        "operational_label"
+      ],
+      "value": 80.7
+    },
+    {
+      "row": 3824,
+      "reasons": [
+        "operational_label"
+      ],
+      "value": 232.2
+    },
+    {
+      "row": 3992,
+      "reasons": [
+        "operational_label"
+      ],
+      "value": 80.7
+    },
+    {
+      "row": 4408,
+      "reasons": [
+        "operational_label"
+      ],
+      "value": 98.7
+    },
+    {
+      "row": 4664,
+      "reasons": [
+        "operational_label"
+      ],
+      "value": 158.5
+    },
+    {
+      "row": 4709,
+      "reasons": [
+        "operational_label"
+      ],
+      "value": 158.5
+    },
+    {
+      "row": 4829,
+      "reasons": [
+        "operational_label"
+      ],
+      "value": 148.5
+    },
+    {
+      "row": 4928,
+      "reasons": [
+        "operational_label"
+      ],
+      "value": 216.2
+    },
+    {
+      "row": 5075,
+      "reasons": [
+        "operational_label"
+      ],
+      "value": 158.5
+    },
+    {
+      "row": 5491,
+      "reasons": [
+        "operational_label"
+      ],
+      "value": 89.7
+    },
+    {
+      "row": 5856,
+      "reasons": [
+        "missing_client"
+      ],
+      "value": 1486
+    },
+    {
+      "row": 5896,
+      "reasons": [
+        "operational_label"
+      ],
+      "value": 104.7
+    },
+    {
+      "row": 5921,
+      "reasons": [
+        "operational_label"
+      ],
+      "value": 116.7
+    }
+  ],
   "reconciliation": {
     "gross_with_client_and_value": {
       "lines": 5892,

@@ -9,7 +9,10 @@ const sheets = sheetsMeta.map((sheet) => sheet.sheet)
 const sheetName = sheets.includes('PERFUMES') ? 'PERFUMES' : sheets[0]
 const matrix = sheetsMeta.find((sheet) => sheet.sheet === sheetName).data
 const headers = matrix[0].map((value) => String(value ?? '').trim())
-const source = matrix.slice(1).map((values) => Object.fromEntries(headers.map((header,index)=>[header,values[index]??null])))
+const source = matrix.slice(1).map((values,rowIndex) => ({
+  ...Object.fromEntries(headers.map((header,index)=>[header,values[index]??null])),
+  __sourceRow:rowIndex+2,
+}))
 const normalize = (v) => String(v ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\s+/g, ' ').trim().toLowerCase()
 const date = (v) => v instanceof Date && !Number.isNaN(v.valueOf()) ? v.toISOString().slice(0,10) : null
 const money = (v) => typeof v === 'number' && Number.isFinite(v) ? v : null
@@ -21,7 +24,7 @@ const status = (v) => {
   return 'unknown'
 }
 const isOperationalClientLabel = (v) => ['disponivel para venda'].includes(normalize(v))
-const rows = source.filter((r) => Object.values(r).some((v) => v !== null && String(v).trim())).filter((r)=>normalize(r.CLIENTE)!=='total:')
+const rows = source.filter((r) => headers.some((header) => r[header] !== null && String(r[header]).trim())).filter((r)=>normalize(r.CLIENTE)!=='total:')
 const seen = new Set()
 let duplicates = 0
 const parsed = rows.map((r) => {
@@ -37,7 +40,7 @@ const parsed = rows.map((r) => {
   const accountable = Boolean(importable && saleDate && paymentStatus !== 'unknown' && paymentStatus !== 'cancelled')
   const warnings = [!saleDate&&'invalid_date',paymentStatus==='unknown'&&'unknown_status',!String(r['FORMA DE PAGAMENTO']??'').trim()&&'unknown_payment_method',duplicate&&'possible_duplicate'].filter(Boolean)
   const blockers = [!client&&'missing_client',operationalLabel&&'operational_label',(amount===null||amount<0)&&'invalid_amount'].filter(Boolean)
-  return { rawClient, client, saleDate, amount: amount ?? 0, hasNumericAmount:amount!==null, operationalLabel, paymentStatus, rawStatus:String(r.PAGAMENTO??'').trim()||'(vazio)', paymentMethod: String(r['FORMA DE PAGAMENTO'] ?? '').trim() || 'Não informado', importable, accountable, warnings, blockers, duplicate }
+  return { sourceRow:r.__sourceRow, rawClient, client, saleDate, amount: amount ?? 0, hasNumericAmount:amount!==null, operationalLabel, paymentStatus, rawStatus:String(r.PAGAMENTO??'').trim()||'(vazio)', paymentMethod: String(r['FORMA DE PAGAMENTO'] ?? '').trim() || 'Não informado', importable, accountable, warnings, blockers, duplicate }
 })
 const validRows = parsed.filter((r) => r.importable)
 const accountableRows = parsed.filter((r)=>r.accountable)
@@ -64,16 +67,28 @@ const report = {
   impossibleRows:parsed.filter((r)=>r.blockers.length).length,
   operationalRows:parsed.filter((r)=>r.operationalLabel).length,
   operationalValue:sum(parsed.filter((r)=>r.operationalLabel)),
+  columnGrossValue:sum(parsed.filter((r)=>r.hasNumericAmount)),
   possibleClientDuplicateGroups:[...clientVariantMap.values()].filter((variants)=>variants.size>1).length,
   uniqueClients:new Set(clientRows.map((r)=>r.client)).size,
   rowsWithClient:parsed.filter((r)=>r.client).length, rowsWithNumericValue:parsed.filter((r)=>r.hasNumericAmount).length,
   rawClientNames:clientRows.length, exactClientNames:new Set(clientRows.map((r)=>r.rawClient)).size,
   normalizedClientNames:new Set(clientRows.map((r)=>r.client)).size,
   importedValue:sum(validRows), revenue:sum(accountableRows),
+  grossToDashboardDifference:Math.round((sum(parsed.filter((r)=>r.hasNumericAmount))-sum(accountableRows))*100)/100,
   paid:sum(validRows.filter((r)=>r.paymentStatus==='paid')),
   pending:sum(validRows.filter((r)=>r.paymentStatus==='pending')),
   cancelled:sum(validRows.filter((r)=>r.paymentStatus==='cancelled')),
   reviewValue:sum(validRows.filter((r)=>r.paymentStatus==='unknown')),
+  rejectionReasonCounts:{
+    missing_client:parsed.filter((r)=>r.blockers.includes('missing_client')).length,
+    invalid_amount:parsed.filter((r)=>r.blockers.includes('invalid_amount')).length,
+    operational_label:parsed.filter((r)=>r.blockers.includes('operational_label')).length,
+  },
+  rejectedRows:parsed.filter((r)=>r.blockers.length).map((r)=>({
+    row:r.sourceRow,
+    reasons:r.blockers,
+    value:r.hasNumericAmount?Math.round(r.amount*100)/100:null,
+  })),
   reconciliation: {
     gross_with_client_and_value:{lines:validRows.length,value:sum(validRows)},
     paid:{lines:partition.paid.length,value:sum(partition.paid)},

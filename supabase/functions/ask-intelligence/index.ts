@@ -32,7 +32,10 @@ Deno.serve(async (req) => {
   const { data: metrics, error } = await client.rpc('ai_authorized_aggregates', {
     org_id: organizationId, start_date: start, end_date: end,
   })
-  if (error) return respond({ error: { code: 'metrics_error', message: 'Não foi possível calcular as métricas autorizadas.' } }, 500)
+  if (error) {
+    console.error(JSON.stringify({stage:'aggregate_query',error_code:error.code,organization_id:organizationId,user_id:user.id,duration_ms:Date.now()-startedAt}))
+    return respond({ error: { code: 'AGGREGATE_QUERY_FAILED', message: 'Não foi possível calcular as métricas autorizadas.' } }, 500)
+  }
   if (!metrics || Number(metrics.sales ?? 0) === 0) {
     return respond({ data: {
       resumo:'Não existem informações suficientes no período selecionado.',
@@ -45,10 +48,20 @@ Deno.serve(async (req) => {
     organization_id:organizationId,user_id:user.id,run_type:'question',status:'running',
     metric_keys:Object.keys(metrics),request_hash:requestHash,
   }).select('id').single()
+  if (run.error || !run.data?.id) {
+    console.error(JSON.stringify({stage:'run_create',organization_id:organizationId,user_id:user.id,duration_ms:Date.now()-startedAt}))
+    return respond({error:{code:'INTERNAL_RUN_CREATE_FAILED',message:'Não foi possível iniciar a análise.'}},500)
+  }
+  const finish = async (status:string,errorCode:string|null,extra:Record<string,unknown>={}) => {
+    const result=await client.from('ai_runs').update({
+      status,error_code:errorCode,duration_ms:Date.now()-startedAt,completed_at:new Date().toISOString(),...extra,
+    }).eq('id',run.data.id)
+    if(result.error)console.error(JSON.stringify({stage:'run_update',error_code:result.error.code,organization_id:organizationId,user_id:user.id}))
+  }
   const apiKey = Deno.env.get('OPENAI_API_KEY')
   if (!apiKey) {
-    await client.from('ai_runs').update({status:'failed',error_code:'missing_ai_key',duration_ms:Date.now()-startedAt,completed_at:new Date().toISOString()}).eq('id',run.data?.id)
-    return respond({ error:{ code:'ai_unavailable',message:'A inteligência está temporariamente indisponível.' } },503)
+    await finish('failed','OPENAI_SECRET_MISSING')
+    return respond({ error:{ code:'OPENAI_SECRET_MISSING',message:'A inteligência não está configurada.' } },503)
   }
   let response: Response
   try {
@@ -77,24 +90,39 @@ Deno.serve(async (req) => {
       }),
     })
   } catch {
-    await client.from('ai_runs').update({status:'failed',error_code:'timeout',duration_ms:Date.now()-startedAt,completed_at:new Date().toISOString()}).eq('id',run.data?.id)
-    return respond({error:{code:'ai_timeout',message:'A inteligência demorou mais que o esperado. Tente novamente.'}},504)
+    await finish('failed','OPENAI_TIMEOUT')
+    console.error(JSON.stringify({stage:'openai_fetch',error_code:'OPENAI_TIMEOUT',duration_ms:Date.now()-startedAt,input_bytes:JSON.stringify(metrics).length,organization_id:organizationId,user_id:user.id}))
+    return respond({error:{code:'OPENAI_TIMEOUT',message:'A inteligência demorou mais que o esperado. Tente novamente.'}},504)
   }
   if (!response.ok) {
-    await client.from('ai_runs').update({status:'failed',error_code:'provider_error',duration_ms:Date.now()-startedAt,completed_at:new Date().toISOString()}).eq('id',run.data?.id)
-    return respond({error:{code:'ai_failed',message:'A análise não pôde ser concluída agora.'}},502)
+    let providerCode=''
+    try{providerCode=String((await response.clone().json())?.error?.code??'')}catch{/* corpo não estruturado */}
+    const requestId=response.headers.get('x-request-id')
+    const mapped=response.status===400?(providerCode.includes('model')?'OPENAI_MODEL_ERROR':'OPENAI_BAD_REQUEST')
+      :response.status===401?'OPENAI_AUTH_ERROR':response.status===429?'OPENAI_RATE_LIMIT'
+      :response.status>=500?'OPENAI_UNAVAILABLE':'OPENAI_PROVIDER_ERROR'
+    const httpStatus=response.status===400?400:response.status===401?503:response.status===429?429:response.status>=500?503:502
+    await finish('failed',mapped)
+    console.error(JSON.stringify({stage:'openai_response',provider_status:response.status,provider_code:providerCode||null,provider_request_id:requestId,duration_ms:Date.now()-startedAt,input_bytes:JSON.stringify(metrics).length,organization_id:organizationId,user_id:user.id}))
+    return respond({error:{code:mapped,message:httpStatus===429?'O limite da inteligência foi atingido. Tente mais tarde.':'A OpenAI não conseguiu concluir a análise agora.'}},httpStatus)
   }
   const raw=await response.json()
+  const outputText=typeof raw.output_text==='string'?raw.output_text:
+    raw.output?.flatMap((item:{content?:unknown[]})=>item.content??[])
+      .find((item:{type?:string;text?:string})=>item.type==='output_text')?.text
   let answer:unknown
-  try { answer=JSON.parse(raw.output_text) } catch {
-    await client.from('ai_runs').update({status:'failed',error_code:'invalid_output',duration_ms:Date.now()-startedAt,completed_at:new Date().toISOString()}).eq('id',run.data?.id)
-    return respond({error:{code:'invalid_ai_output',message:'A resposta não passou na validação de segurança.'}},502)
+  try {
+    if(typeof outputText!=='string'||!outputText.trim())throw new Error('missing_output_text')
+    answer=JSON.parse(outputText)
+  } catch {
+    await finish('failed','OPENAI_INVALID_RESPONSE',{model:raw.model??null,input_tokens:raw.usage?.input_tokens??null,output_tokens:raw.usage?.output_tokens??null})
+    console.error(JSON.stringify({stage:'output_validation',provider_status:response.status,provider_request_id:response.headers.get('x-request-id'),has_output_text:Boolean(outputText),output_items:Array.isArray(raw.output)?raw.output.length:0,duration_ms:Date.now()-startedAt,organization_id:organizationId,user_id:user.id}))
+    return respond({error:{code:'OPENAI_INVALID_RESPONSE',message:'A resposta não passou na validação de segurança.'}},502)
   }
-  await client.from('ai_runs').update({
-    status:'completed',model:raw.model,duration_ms:Date.now()-startedAt,
+  await finish('completed',null,{
+    model:raw.model,
     input_tokens:raw.usage?.input_tokens??null,output_tokens:raw.usage?.output_tokens??null,
-    completed_at:new Date().toISOString(),
-  }).eq('id',run.data?.id)
+  })
   await audit(client,organizationId,user.id,'ai_question','ai_run',run.data?.id,{
     period_start:start,period_end:end,metric_keys:Object.keys(metrics),duration_ms:Date.now()-startedAt,
   })

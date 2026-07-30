@@ -153,6 +153,13 @@ export async function askIntelligence(question:string,period:PeriodValue) {
     const messages:Record<string,string>={
       unauthorized:'Sua sessão expirou. Entre novamente para continuar.',
       rate_limit:'O limite de análises foi atingido. Aguarde um minuto.',
+      OPENAI_AUTH_ERROR:'A conexão segura com a OpenAI precisa ser revisada.',
+      OPENAI_MODEL_ERROR:'O modelo de inteligência configurado não está disponível.',
+      OPENAI_RATE_LIMIT:'O limite da inteligência foi atingido. Tente mais tarde.',
+      OPENAI_TIMEOUT:'A análise excedeu o tempo esperado. Tente novamente.',
+      OPENAI_INVALID_RESPONSE:'A resposta recebida não passou na validação de segurança.',
+      OPENAI_SECRET_MISSING:'O serviço de inteligência ainda não está configurado.',
+      AGGREGATE_QUERY_FAILED:'Não foi possível preparar os agregados comerciais.',
       ai_failed:'A OpenAI não conseguiu concluir a análise agora.',
       ai_timeout:'A análise excedeu o tempo esperado. Tente novamente.',
       ai_unavailable:'O serviço de inteligência não está configurado.',

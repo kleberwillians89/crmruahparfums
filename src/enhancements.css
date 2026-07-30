@@ -51,3 +51,82 @@
   .page-actions{width:100%}
   .page-actions>*{flex:1}
 }
+
+/* Mobile operational layout */
+html,body,#root{max-width:100%;overflow-x:hidden}
+button,a,input,select,textarea{touch-action:manipulation}
+@media(max-width:760px){
+  header{gap:8px}
+  header>div:nth-child(2){min-width:0}
+  header h1{font-size:17px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  header p{display:none}
+  .header-actions{gap:5px}
+  .header-actions .avatar{width:34px;height:34px}
+  .page{width:100%;padding:20px 12px 34px}
+  .page-lead{gap:14px;margin-bottom:18px}
+  .page-lead h2{font-size:21px}
+  .page-lead p{font-size:12px;line-height:1.5}
+  .page-actions{display:grid;grid-template-columns:1fr;width:100%;gap:8px}
+  .page-actions>*{width:100%;min-height:44px;justify-content:center}
+  .period-filter,.period-filter>.date-filter{width:100%}
+  .period-filter>.date-filter{justify-content:center;min-width:0}
+  .period-filter>.date-filter span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .period-popover{inset:62px 8px 8px;border-radius:14px;max-height:calc(100dvh - 70px)}
+  .period-presets{grid-template-columns:1fr 1fr;position:static}
+  .period-calendar{padding:12px;min-width:0}
+  .period-calendar .rdp-root{font-size:12px;max-width:100%;overflow:auto}
+  .period-calendar .rdp-months{align-items:center}
+  .period-calendar .rdp-month{width:100%;max-width:330px}
+  .period-actions{position:sticky;bottom:-12px;background:#fff;padding:12px 0 calc(12px + env(safe-area-inset-bottom))}
+  .period-actions button{min-height:44px;flex:1;justify-content:center}
+  .toolbar,.sales-filters{display:grid;grid-template-columns:1fr;height:auto;padding:10px}
+  .toolbar input,.toolbar select{width:100%;min-height:44px;font-size:16px}
+  .metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .metric{min-height:116px;padding:12px;grid-template-columns:34px 1fr;column-gap:8px}
+  .metric-icon{width:34px;height:34px}
+  .metric>strong{font-size:18px;overflow-wrap:anywhere}
+  .coverage{grid-template-columns:1fr 1fr;padding:13px}
+  .coverage>div{padding:0 10px}
+  .dashboard-grid{gap:10px}
+  .chart-card{min-height:280px;padding:12px}
+  .chart-card .recharts-responsive-container{min-width:520px}
+  .chart-card{overflow-x:auto}
+  .payment-chart .recharts-responsive-container{min-width:190px}
+  .clients-caption{align-items:flex-start;gap:10px;padding:14px}
+  .clients-caption button{min-height:40px}
+  .clients-table{background:transparent;border:0;overflow:visible}
+  .clients-table .table-wrap{overflow:visible;border:0}
+  .clients-table table,.clients-table tbody{display:block;white-space:normal}
+  .clients-table thead{display:none}
+  .clients-table tbody tr{display:grid;grid-template-columns:1fr 1fr;gap:0;background:#fff;border:1px solid var(--line);border-radius:12px;margin-bottom:10px;padding:10px;box-shadow:0 4px 14px #2b21130a}
+  .clients-table td{display:flex;min-width:0;align-items:center;padding:8px;border:0;border-bottom:1px solid #f0ece5;overflow-wrap:anywhere;white-space:normal}
+  .clients-table td:first-child{grid-column:1/-1;font-size:12px}
+  .clients-table td:last-child{grid-column:1/-1;border-bottom:0;gap:7px;flex-wrap:wrap}
+  .clients-table td button{min-height:38px;border:1px solid var(--line);border-radius:7px;background:#fff;padding:0 10px}
+  .table-foot{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px}
+  .suggestions{grid-template-columns:1fr}
+  .suggestions button{min-height:48px;font-size:11px}
+  .chat-box{padding:14px}
+  .chat-input{position:sticky;bottom:8px;background:#fff;z-index:2}
+  .chat-input input{min-height:44px;font-size:16px}
+  .chat-input button{width:44px;height:44px;flex:0 0 44px}
+  .ai-answer{overflow-wrap:anywhere}
+  .intelligence-hero{padding:18px 4px}
+  .intelligence-hero h2{font-size:24px}
+  .modal-panel{width:100%;height:100dvh}
+  .record-form{padding:16px 12px calc(90px + env(safe-area-inset-bottom))}
+  .field input,.field select,.field textarea{min-height:46px;font-size:16px}
+  .form-actions{position:fixed;left:0;right:0;bottom:0;margin:0;padding:12px;background:#fbfaf7;box-shadow:0 -8px 24px #0001}
+  .form-actions button{min-height:46px;flex:1}
+  .calendar-popover{width:calc(100vw - 16px);max-height:calc(100dvh - 100px);overflow:auto}
+  .import-steps{overflow:hidden}
+  .import-stats{grid-template-columns:1fr 1fr}
+  .dropzone{min-height:280px}
+  .internal-mugo-signature{padding-bottom:78px;text-align:center}
+}
+@media(max-width:359px){
+  .metrics{grid-template-columns:1fr}
+  .period-presets{grid-template-columns:1fr}
+  header{padding:0 10px}
+  .header-actions .avatar{display:none}
+}

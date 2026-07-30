@@ -10,11 +10,14 @@
 }
 
 .auth-box {
+  width: 100%;
+  max-width: 410px;
   min-width: 0;
 }
 
 .mugo-signature {
-  width: min(410px, 100%);
+  width: 100%;
+  max-width: 410px;
   margin-top: 32px;
   padding-top: 18px;
   border-top: 1px solid #e4ded4;
@@ -85,7 +88,27 @@
 }
 
 @media (max-width: 760px) {
+  .auth-page {
+    width: 100%;
+    max-width: 100vw;
+    grid-template-columns: minmax(0, 1fr);
+    overflow: hidden;
+  }
+
+  .auth-form-panel {
+    width: 100vw;
+    max-width: 100vw;
+  }
+
+  .auth-box,
+  .mugo-signature {
+    width: calc(100vw - 80px);
+    max-width: 410px;
+  }
+
   .auth-options {
+    align-items: flex-start;
+    flex-direction: column;
     gap: 10px;
   }
 
@@ -93,16 +116,42 @@
   .auth-options button {
     flex: 0 1 auto;
     padding: 0;
-    white-space: nowrap;
+    white-space: normal;
   }
 
   .mugo-signature {
     margin-top: 25px;
+    align-items: center;
+    justify-content: flex-start;
+    overflow-wrap: anywhere;
   }
 
   .mugo-3d {
     width: 46px;
     height: 46px;
+  }
+}
+
+@media (max-width: 359px) {
+  .auth-form-panel {
+    padding-inline: 14px;
+  }
+
+  .auth-options {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .mugo-signature {
+    gap: 8px;
+  }
+
+  .mugo-signature > div {
+    grid-template-columns: 18px minmax(0, 1fr);
+  }
+
+  .mugo-signature img {
+    width: 18px;
   }
 }
 

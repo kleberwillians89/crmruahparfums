@@ -19,6 +19,10 @@ Deno.serve(async (req) => {
   if (!['admin','manager','operator','viewer'].includes(role)) {
     return respond({ error: { code: 'forbidden', message: 'Perfil sem acesso à inteligência.' } }, 403)
   }
+  await client.from('ai_runs').update({
+    status:'failed',error_code:'INTERRUPTED_EXECUTION',completed_at:new Date().toISOString(),
+  }).eq('user_id',user.id).eq('organization_id',organizationId).eq('status','running')
+    .lt('created_at',new Date(Date.now()-120_000).toISOString())
   const since = new Date(Date.now() - 60_000).toISOString()
   const { count } = await client.from('ai_runs').select('id', { count:'exact', head:true })
     .eq('user_id', user.id).gte('created_at', since)

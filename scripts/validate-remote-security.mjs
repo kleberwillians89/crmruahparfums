@@ -12,7 +12,15 @@ const check = async (name, url, options, expected) => {
   const response = await fetch(url, options)
   results.push({ name, status:response.status, passed:expected.includes(response.status) })
 }
-await check('RLS: leitura anônima sem vazamento',`${base}/rest/v1/clients?select=id&limit=1`,{headers},[200])
+for (const table of ['clients','perfumes','sales']) {
+  const response = await fetch(`${base}/rest/v1/${table}?select=id&limit=1`, { headers })
+  const body = response.ok ? await response.json() : null
+  results.push({
+    name:`RLS: ${table} anônimo sem vazamento`,
+    status:response.status,
+    passed:response.status===200 && Array.isArray(body) && body.length===0,
+  })
+}
 await check('RLS: escrita anônima bloqueada',`${base}/rest/v1/clients`,{method:'POST',headers,body:'{}'},[401,403])
 await check('Bucket comercial não público',`${base}/storage/v1/object/public/commercial-imports/security-check.txt`,{},[400,404])
 for (const fn of ['process-import','confirm-import','revert-import','generate-insights','ask-intelligence','recalculate-metrics']) {

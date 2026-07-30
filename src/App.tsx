@@ -12,13 +12,15 @@ import report from './data/validation-report.json'
 import { ClientModal, SaleModal } from './components/RecordModals'
 import {
   ClientCommercialSummary, CommercialSale, DashboardMetrics,
-  fetchClientSummaries, fetchDashboardMetrics, fetchSalesPage,
+  PerfumeCommercialSummary, fetchClientSummaries, fetchDashboardMetrics,
+  fetchPerfumeSummaries, fetchSalesPage,
 } from './lib/records'
 
-type Page = 'Visão Geral' | 'Clientes' | 'Vendas' | 'Importar Dados' | 'RUAH Intelligence' | 'Insights' | 'Configurações'
+type Page = 'Visão Geral' | 'Clientes' | 'Vendas' | 'Perfumes' | 'Importar Dados' | 'RUAH Intelligence' | 'Insights' | 'Configurações'
 const navigation: { label: Page; icon: typeof Home }[] = [
   { label: 'Visão Geral', icon: Home }, { label: 'Clientes', icon: UsersRound },
-  { label: 'Vendas', icon: ShoppingBag }, { label: 'Importar Dados', icon: Import },
+  { label: 'Vendas', icon: ShoppingBag }, { label: 'Perfumes', icon: Sparkles },
+  { label: 'Importar Dados', icon: Import },
   { label: 'RUAH Intelligence', icon: Sparkles }, { label: 'Insights', icon: Lightbulb },
   { label: 'Configurações', icon: Settings },
 ]
@@ -247,8 +249,8 @@ function ClientsPage() {
     <div className="page-lead"><div><h2>Clientes</h2><p>Relacionamento, recorrência e histórico em um só lugar.</p></div><button className="primary" onClick={()=>setModal(true)}><Plus size={17}/> Adicionar cliente</button></div>
     {loading?<div className="empty card"><h3>Carregando clientes do Supabase…</h3></div>:error?<div className="notice"><AlertTriangle size={18}/><span>{error}</span></div>:
     <div className="card clients-table"><div className="clients-caption"><div><strong>{integer(clients.length)} clientes</strong><span>Ordenados por valor pago, do maior para o menor</span></div><span className="live-dot">SUPABASE</span></div>
-      <div className="table-wrap"><table><thead><tr><th>Cliente</th><th>Total comprado</th><th>Pago</th><th>Aguardando</th><th>Cancelado</th><th>Em revisão</th><th>Itens</th><th>Ticket médio</th><th>Primeira compra</th><th>Última compra</th></tr></thead>
-      <tbody>{clients.map((c)=><tr key={c.client_id}><td><strong>{c.client}</strong></td><td>{brl(Number(c.total_purchased))}</td><td>{brl(Number(c.paid))}</td><td>{brl(Number(c.pending))}</td><td>{brl(Number(c.cancelled))}</td><td>{brl(Number(c.review))}</td><td>{integer(Number(c.item_count))}</td><td>{brl(Number(c.average_ticket))}</td><td>{c.first_purchase?shortDate(`${c.first_purchase}T12:00:00`):'—'}</td><td>{c.last_purchase?shortDate(`${c.last_purchase}T12:00:00`):'—'}</td></tr>)}</tbody></table></div>
+      <div className="table-wrap"><table><thead><tr><th>Cliente</th><th>Total comprado</th><th>Pago</th><th>Aguardando</th><th>Itens</th><th>ML</th><th>Perfumes</th><th>Tipos</th><th>Ticket médio</th><th>Primeira compra</th><th>Última compra</th></tr></thead>
+      <tbody>{clients.map((c)=><tr key={c.client_id}><td><strong>{c.client}</strong></td><td>{brl(Number(c.total_purchased))}</td><td>{brl(Number(c.paid))}</td><td>{brl(Number(c.pending))}</td><td>{integer(Number(c.item_count))}</td><td>{Number(c.total_ml).toLocaleString('pt-BR')} ml</td><td title={(c.perfumes??[]).join(', ')}>{(c.perfumes??[]).slice(0,2).join(', ')||'—'}</td><td>{(c.sale_types??[]).join(' / ')||'—'}</td><td>{brl(Number(c.average_ticket))}</td><td>{c.first_purchase?shortDate(`${c.first_purchase}T12:00:00`):'—'}</td><td>{c.last_purchase?shortDate(`${c.last_purchase}T12:00:00`):'—'}</td></tr>)}</tbody></table></div>
     </div>}
   </div>
 }
@@ -263,8 +265,27 @@ function SalesPage() {
     <div className="page-lead"><div><h2>Vendas</h2><p>Dados consultados diretamente no Supabase.</p></div><button className="primary" onClick={()=>setModal(true)}><Plus size={17}/> Adicionar venda</button></div>
     {error?<div className="notice"><AlertTriangle size={18}/><span>{error}</span></div>:
     <div className="card clients-table"><div className="clients-caption"><div><strong>{integer(count)} vendas</strong><span>Exibindo as 200 mais recentes</span></div><span className="live-dot">SUPABASE</span></div>
-      <div className="table-wrap"><table><thead><tr><th>Data</th><th>Cliente</th><th>Valor</th><th>Status</th><th>Pagamento</th></tr></thead>
-      <tbody>{sales.map((sale)=><tr key={sale.id}><td>{sale.sale_date?shortDate(`${sale.sale_date}T12:00:00`):'—'}</td><td><strong>{sale.clients?.name??sale.original_client??'—'}</strong></td><td>{brl(Number(sale.amount))}</td><td><span className={`badge ${sale.payment_status}`}>{statusLabel[sale.payment_status]}</span></td><td>{sale.payment_method??'—'}</td></tr>)}</tbody></table></div>
+      <div className="table-wrap"><table><thead><tr><th>Cliente</th><th>Data</th><th>Perfume</th><th>Frasco</th><th>Tipo</th><th>ML</th><th>Valor</th><th>Pagamento</th><th>Forma</th><th>Data pagmt.</th><th>Prazo/status envio</th><th>Enviado em</th><th>Observação</th></tr></thead>
+      <tbody>{sales.map((sale)=><tr key={sale.id}><td><strong>{sale.clients?.name??sale.original_client??'—'}</strong></td><td>{sale.sale_date?shortDate(`${sale.sale_date}T12:00:00`):'—'}</td><td>{sale.perfume_name_raw??'—'}</td><td>{sale.bottle_identifier??'—'}</td><td>{sale.sale_type??'—'}</td><td>{sale.volume_ml===null?'Revisar':`${Number(sale.volume_ml).toLocaleString('pt-BR')} ml`}</td><td>{brl(Number(sale.amount))}</td><td><span className={`badge ${sale.payment_status}`}>{statusLabel[sale.payment_status]}</span></td><td>{sale.payment_method??'—'}</td><td>{sale.paid_at?shortDate(`${sale.paid_at}T12:00:00`):'—'}</td><td>{sale.shipping_deadline_raw||sale.shipping_operational_status||'—'}</td><td>{sale.shipped_at?shortDate(`${sale.shipped_at}T12:00:00`):'—'}</td><td>{sale.notes??'—'}</td></tr>)}</tbody></table></div>
+    </div>}
+  </div>
+}
+
+function PerfumesPage() {
+  const [perfumes,setPerfumes]=useState<PerfumeCommercialSummary[]>([])
+  const [search,setSearch]=useState('')
+  const [type,setType]=useState('')
+  const [error,setError]=useState('')
+  useEffect(()=>{fetchPerfumeSummaries().then(setPerfumes).catch(()=>setError('Não foi possível consultar os perfumes.'))},[])
+  const visible=perfumes.filter((item)=>item.perfume_name.toLowerCase().includes(search.toLowerCase())
+    && (!type||(item.sale_types??[]).includes(type)))
+  return <div className="page"><div className="page-lead"><div><h2>Perfumes</h2><p>Itens, frascos, volumes, clientes e operação de envio.</p></div></div>
+    <div className="toolbar card"><div className="search"><Search size={18}/><input value={search} onChange={(event)=>setSearch(event.target.value)} placeholder="Filtrar por perfume ou frasco…"/></div>
+      <button className={!type?'active':''} onClick={()=>setType('')}>Todos</button><button onClick={()=>setType('APC')}>APC</button><button onClick={()=>setType('SPLIT')}>SPLIT</button></div>
+    {error?<div className="notice"><AlertTriangle size={18}/><span>{error}</span></div>:
+    <div className="card clients-table"><div className="clients-caption"><div><strong>{integer(visible.length)} referências</strong><span>Frascos diferentes permanecem separados</span></div><span className="live-dot">SUPABASE</span></div>
+      <div className="table-wrap"><table><thead><tr><th>Perfume</th><th>Frasco</th><th>Tipos</th><th>ML total</th><th>ML pago</th><th>ML aguardando</th><th>Estoque</th><th>Clientes</th><th>Itens</th><th>Valor total</th><th>Pago</th><th>Aguardando</th><th>Status de envio</th></tr></thead>
+      <tbody>{visible.map((item)=><tr key={item.perfume_id}><td><strong>{item.perfume_name}</strong></td><td>{item.bottle_identifier??'—'}</td><td>{(item.sale_types??[]).join(' / ')||'—'}</td><td>{Number(item.total_ml).toLocaleString('pt-BR')} ml</td><td>{Number(item.paid_ml).toLocaleString('pt-BR')} ml</td><td>{Number(item.pending_ml).toLocaleString('pt-BR')} ml</td><td>{Number(item.stock_ml).toLocaleString('pt-BR')} ml · {integer(Number(item.stock_items))} itens</td><td>{integer(Number(item.client_count))}</td><td>{integer(Number(item.item_count))}</td><td>{brl(Number(item.total_value))}</td><td>{brl(Number(item.paid_value))}</td><td>{brl(Number(item.pending_value))}</td><td>{(item.shipping_statuses??[]).join(', ')||'—'}</td></tr>)}</tbody></table></div>
     </div>}
   </div>
 }
@@ -276,6 +297,7 @@ export function App() {
     if (page === 'Visão Geral') return <Dashboard/>
     if (page === 'Clientes') return <ClientsPage/>
     if (page === 'Vendas') return <SalesPage/>
+    if (page === 'Perfumes') return <PerfumesPage/>
     if (page === 'Importar Dados') return <ImportPage/>
     if (page === 'RUAH Intelligence') return <Intelligence/>
     if (page === 'Insights') return <Insights/>

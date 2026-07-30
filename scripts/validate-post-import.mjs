@@ -48,7 +48,15 @@ const { body: batch } = await request(
 const { body: rawSample } = await request(
   `/rest/v1/import_rows?import_batch_id=eq.${batchId}&select=raw_data,normalized_data,row_type&limit=1`,
 )
+const { body: externalSales } = await request(
+  `/rest/v1/sales?organization_id=eq.${organizationId}&import_batch_id=is.null&select=id,amount,payment_status,source,clients(name)`,
+)
 const errors = await count('import_errors', `organization_id=eq.${organizationId}`)
+const batchSales = await count('sales', `import_batch_id=eq.${batchId}`)
+const missingPerfume = await count('sales', `import_batch_id=eq.${batchId}&perfume_id=is.null`)
+const missingType = await count('sales', `import_batch_id=eq.${batchId}&sale_type=is.null`)
+const missingVolume = await count('sales', `import_batch_id=eq.${batchId}&volume_ml=is.null`)
+const oldBatch = await count('import_batches', 'id=eq.3bb120e0-b173-43c4-a336-6c91594f6f08')
 const expectedLeaders = [
   ['thais', 70232.71],
   ['erica freitas', 66678.30],
@@ -66,24 +74,32 @@ for (const [name, paid] of expectedLeaders) {
 }
 const checks = {
   clients: Number(metrics.clients) === 418,
-  sales: Number(metrics.sales) === 5892,
+  sales: Number(metrics.sales) === 5893,
   paid_rows: Number(metrics.paid_rows) === 5495,
-  pending_rows: Number(metrics.pending_rows) === 354,
+  pending_rows: Number(metrics.pending_rows) === 355,
   paid: Number(metrics.paid) === 1561552.38,
-  pending: Number(metrics.pending) === 91257.80,
+  pending: Number(metrics.pending) === 92257.80,
   raw_gross: Number(metrics.raw_gross) === 1673690.78,
   stock_rows: Number(metrics.stock_rows) === 15,
   stock_pending: Number(metrics.stock_pending) === 1340.20,
-  review_rows: Number(metrics.review_rows) === 34,
+  review_rows: Number(metrics.review_rows) === 35,
+  preserved_review_rows: Number(metrics.preserved_review_rows) === 34,
   possible_duplicates: Number(metrics.possible_duplicates) === 20,
   batch_rows: Number(metrics.batch_rows) === 5926,
   batch_completed: batch[0]?.status === 'completed',
   raw_credit_preserved: Object.hasOwn(rawSample[0]?.raw_data ?? {}, 'CRÉDITO'),
-  credit_not_normalized: !Object.hasOwn(rawSample[0]?.normalized_data ?? {}, 'CRÉDITO'),
+  credit_reference_mapped: Object.hasOwn(rawSample[0]?.normalized_data ?? {}, 'credit_reference_amount'),
   ranking_descending: clients.every((client, index) =>
     index === 0 || Number(clients[index - 1].paid) >= Number(client.paid)
   ),
   import_errors: errors === 0,
+  batch_sales: batchSales === 5892,
+  every_item_has_perfume: missingPerfume === 0,
+  every_item_has_sale_type: missingType === 0,
+  one_unrecoverable_ml_preserved_for_review: missingVolume === 1,
+  external_manual_sale_preserved: externalSales.length === 1
+    && externalSales[0].id === 'a18a93b5-351c-4d5b-b1f0-2867def0f2dd',
+  old_batch_removed: oldBatch === 0,
 }
 if (Object.values(checks).some((value) => !value)) {
   console.log(JSON.stringify({ metrics, batch: batch[0], checks }, null, 2))
@@ -94,6 +110,7 @@ console.log(JSON.stringify({
   import_batch_id: batchId,
   metrics,
   import_errors: errors,
+  external_sales: externalSales,
   checks,
   top_20_clients: clients.slice(0, 20).map((client) => ({
     client: client.client,

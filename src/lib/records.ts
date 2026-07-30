@@ -21,7 +21,7 @@ export type DashboardMetrics = {
   clients:number; sales:number; paid:number; pending:number; cancelled:number; review:number
   paid_rows:number; pending_rows:number; cancelled_rows:number; review_rows:number
   raw_gross:number; batch_rows:number; stock_rows:number; stock_pending:number
-  possible_duplicates:number; first_sale:string|null; last_sale:string|null
+  preserved_review_rows:number; possible_duplicates:number; first_sale:string|null; last_sale:string|null
 }
 
 export async function fetchDashboardMetrics() {
@@ -34,6 +34,7 @@ export async function fetchDashboardMetrics() {
 export type ClientCommercialSummary = {
   client_id:string; client:string; total_purchased:number; paid:number; pending:number
   cancelled:number; review:number; item_count:number; average_ticket:number
+  total_ml:number; perfumes:string[]; sale_types:string[]
   first_purchase:string|null; last_purchase:string|null
 }
 
@@ -46,17 +47,36 @@ export async function fetchClientSummaries() {
 
 export type CommercialSale = {
   id:string; sale_date:string|null; amount:number; payment_status:string
-  payment_method:string|null; original_client:string|null; clients:{name:string}|null
+  payment_method:string|null; paid_at:string|null; original_client:string|null
+  perfume_name_raw:string|null; bottle_identifier:string|null; sale_type:string|null
+  volume_ml:number|null; shipping_deadline_raw:string|null
+  shipping_operational_status:string|null; shipped_at:string|null; notes:string|null
+  clients:{name:string}|null
 }
 
 export async function fetchSalesPage() {
   const { organizationId } = await authenticatedOrganization()
   const { data, error, count } = await supabase!.from('sales')
-    .select('id,sale_date,amount,payment_status,payment_method,original_client,clients(name)', { count:'exact' })
+    .select('id,sale_date,amount,payment_status,payment_method,paid_at,original_client,perfume_name_raw,bottle_identifier,sale_type,volume_ml,shipping_deadline_raw,shipping_operational_status,shipped_at,notes,clients(name)', { count:'exact' })
     .eq('organization_id', organizationId).is('deleted_at', null)
     .order('sale_date', { ascending:false, nullsFirst:false }).limit(200)
   if (error) throw new Error(error.message)
   return { rows:(data ?? []) as unknown as CommercialSale[], count:count ?? 0 }
+}
+
+export type PerfumeCommercialSummary = {
+  perfume_id:string; perfume_name:string; bottle_identifier:string|null
+  total_ml:number; paid_ml:number; pending_ml:number; stock_ml:number; stock_items:number
+  client_count:number; item_count:number; total_value:number; paid_value:number
+  pending_value:number; sale_types:string[]; shipping_deadlines:string[]
+  shipping_statuses:string[]; shipped_dates:string[]
+}
+
+export async function fetchPerfumeSummaries() {
+  const { organizationId } = await authenticatedOrganization()
+  const { data, error } = await supabase!.rpc('perfume_commercial_summary', { org_id:organizationId })
+  if (error) throw new Error(error.message)
+  return (data ?? []) as PerfumeCommercialSummary[]
 }
 
 export type ClientInput = {

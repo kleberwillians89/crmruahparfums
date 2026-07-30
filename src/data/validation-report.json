@@ -1,0 +1,190 @@
+{
+  "source": "JULHO - PLANILHA DE VENDAS.xlsx",
+  "sheet": "PERFUMES",
+  "sheets": 4,
+  "rows": 5926,
+  "valid": 5907,
+  "rejected": 19,
+  "duplicates": 284,
+  "warningRows": 667,
+  "impossibleRows": 19,
+  "possibleClientDuplicateGroups": 2,
+  "uniqueClients": 419,
+  "rowsWithClient": 5925,
+  "rowsWithNumericValue": 5908,
+  "rawClientNames": 5925,
+  "exactClientNames": 421,
+  "normalizedClientNames": 419,
+  "importedValue": 1672204.78,
+  "revenue": 1654150.38,
+  "paid": 1561552.38,
+  "pending": 92598,
+  "cancelled": 5159,
+  "reviewValue": 12895.4,
+  "reconciliation": {
+    "gross_with_client_and_value": {
+      "lines": 5907,
+      "value": 1672204.78
+    },
+    "paid": {
+      "lines": 5495,
+      "value": 1561552.38
+    },
+    "pending": {
+      "lines": 362,
+      "value": 92598
+    },
+    "cancelled": {
+      "lines": 8,
+      "value": 5159
+    },
+    "unstandardized_status": {
+      "lines": 42,
+      "value": 12895.4
+    },
+    "invalid_or_missing_date": {
+      "lines": 0,
+      "value": 0
+    },
+    "possible_duplicate": {
+      "lines": 283,
+      "value": 47178.6
+    },
+    "missing_value": {
+      "lines": 18,
+      "value": 0
+    },
+    "dashboard_accounted": {
+      "lines": 5857,
+      "value": 1654150.38
+    },
+    "excluded_from_revenue": {
+      "lines": 50,
+      "value": 18054.4
+    },
+    "impossible_without_client": {
+      "lines": 1,
+      "value": 1486
+    }
+  },
+  "previous_report": {
+    "valid_value": 1563985.48,
+    "dashboard_revenue": 1560267.48,
+    "strict_recalculated": 1563985.48,
+    "difference_gross_vs_previous": 108219.3
+  },
+  "paymentMethods": [
+    {
+      "name": "PIX",
+      "value": 3889
+    },
+    {
+      "name": "CARTÃO DE CRÉDITO",
+      "value": 1399
+    },
+    {
+      "name": "Não informado",
+      "value": 407
+    },
+    {
+      "name": "CRÉDITO E PIX",
+      "value": 95
+    },
+    {
+      "name": "DEPÓSITO",
+      "value": 92
+    },
+    {
+      "name": "ACORDO COM GABRIELA",
+      "value": 11
+    },
+    {
+      "name": "PRESENTE DA GABI",
+      "value": 4
+    },
+    {
+      "name": "PX",
+      "value": 2
+    },
+    {
+      "name": "DIRETO COM A GABRIELA",
+      "value": 1
+    },
+    {
+      "name": "PAGO COM CRÉDITO",
+      "value": 1
+    },
+    {
+      "name": "PIX PARA MARIANA",
+      "value": 1
+    },
+    {
+      "name": "CARTAO DE CRÉDITO",
+      "value": 1
+    },
+    {
+      "name": "P",
+      "value": 1
+    },
+    {
+      "name": "PRESENTE GABI",
+      "value": 1
+    },
+    {
+      "name": "BRINDE GABRIELA",
+      "value": 1
+    },
+    {
+      "name": "PP",
+      "value": 1
+    }
+  ],
+  "statusCounts": [
+    {
+      "name": "paid",
+      "value": 5495
+    },
+    {
+      "name": "pending",
+      "value": 362
+    },
+    {
+      "name": "unknown",
+      "value": 42
+    },
+    {
+      "name": "cancelled",
+      "value": 8
+    }
+  ],
+  "monthly": [
+    {
+      "month": "2026-01",
+      "revenue": 50582.3
+    },
+    {
+      "month": "2026-02",
+      "revenue": 87898.2
+    },
+    {
+      "month": "2026-03",
+      "revenue": 232301.8
+    },
+    {
+      "month": "2026-04",
+      "revenue": 239679.2
+    },
+    {
+      "month": "2026-05",
+      "revenue": 388805.6
+    },
+    {
+      "month": "2026-06",
+      "revenue": 326853.88
+    },
+    {
+      "month": "2026-07",
+      "revenue": 328029.4
+    }
+  ]
+}

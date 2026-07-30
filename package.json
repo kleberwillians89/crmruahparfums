@@ -1,0 +1,47 @@
+{
+  "name": "ruah-intelligence",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "validate:workbook": "node scripts/validate-workbook.mjs",
+    "test:remote-security": "node scripts/validate-remote-security.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.52.1",
+    "date-fns": "^4.1.0",
+    "lucide-react": "^0.468.0",
+    "papaparse": "^5.5.4",
+    "react": "^19.0.0",
+    "react-day-picker": "^10.0.1",
+    "react-dom": "^19.0.0",
+    "read-excel-file": "^9.3.5",
+    "recharts": "^2.15.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.10.2",
+    "@types/papaparse": "^5.5.2",
+    "@types/react": "^19.0.3",
+    "@types/react-dom": "^19.0.2",
+    "@vitejs/plugin-react": "^5.0.4",
+    "esbuild": "^0.28.1",
+    "eslint": "^10.8.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.3",
+    "globals": "^15.14.0",
+    "typescript": "~5.7.2",
+    "typescript-eslint": "^8.18.2",
+    "vite": "^7.3.5",
+    "vitest": "^4.1.0"
+  },
+  "overrides": {
+    "vite": {
+      "esbuild": "0.28.1"
+    }
+  }
+}

@@ -1,0 +1,14 @@
+project_id = "ruah-intelligence"
+
+[functions.process-import]
+verify_jwt = true
+[functions.confirm-import]
+verify_jwt = true
+[functions.revert-import]
+verify_jwt = true
+[functions.generate-insights]
+verify_jwt = true
+[functions.ask-intelligence]
+verify_jwt = true
+[functions.recalculate-metrics]
+verify_jwt = true

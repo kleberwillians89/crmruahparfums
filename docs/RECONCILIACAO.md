@@ -18,15 +18,15 @@ As quatro categorias de status abaixo são mutuamente exclusivas e fecham exatam
 
 | Categoria | Linhas | Valor |
 |---|---:|---:|
-| Total bruto com cliente e valor | 5.907 | R$ 1.672.204,78 |
+| Total bruto de vendas identificáveis | 5.892 | R$ 1.669.948,58 |
 | Pago | 5.495 | R$ 1.561.552,38 |
-| Aguardando | 362 | R$ 92.598,00 |
+| Aguardando | 354 | R$ 91.257,80 |
 | Cancelado | 8 | R$ 5.159,00 |
-| Status não padronizado | 42 | R$ 12.895,40 |
-| Total incluído no dashboard | 5.857 | R$ 1.654.150,38 |
-| Total excluído do faturamento | 50 | R$ 18.054,40 |
+| Status não padronizado | 35 | R$ 11.979,40 |
+| Total incluído no dashboard | 5.849 | R$ 1.652.810,18 |
+| Total excluído do faturamento | 43 | R$ 17.138,40 |
 
-Conferência: pago + aguardando + cancelado + revisão = **R$ 1.672.204,78**.
+Conferência: pago + aguardando + cancelado + revisão = **R$ 1.669.948,58**.
 
 ## Qualidade e sobreposições
 
@@ -35,11 +35,12 @@ Estas categorias são marcadores de qualidade e podem se sobrepor às categorias
 | Marcador | Linhas | Valor associado |
 |---|---:|---:|
 | Data inválida ou ausente entre vendas com cliente e valor | 0 | R$ 0,00 |
-| Possível duplicidade | 283 | R$ 47.178,60 |
+| Possível duplicidade comercial | 20 | R$ 2.909,50 |
 | Cliente presente, valor ausente | 18 | R$ 0,00 |
 | Valor presente, cliente ausente | 1 | R$ 1.486,00 |
+| Rótulo `DISPONÍVEL PARA VENDA` | 15 | R$ 2.256,20 |
 
-A aba possui 5.925 linhas com cliente, 421 nomes de exibição distintos e 419 nomes após normalização exata de espaços, capitalização e acentos. Nenhum nome é unido por similaridade.
+A aba possui 5.925 linhas preenchidas na coluna CLIENTE. Quinze delas usam o rótulo operacional `DISPONÍVEL PARA VENDA`, que representa estoque e não uma pessoa. Restam 420 nomes de exibição e 418 clientes após normalização exata. Nenhum nome é unido por similaridade.
 
 A simulação encontrou dois grupos de colisão de normalização (quatro grafias brutas envolvidas). Eles permanecem na fila de revisão; nenhuma união automática será feita.
 
@@ -47,4 +48,4 @@ A simulação encontrou dois grupos de colisão de normalização (quatro grafia
 
 Os R$ 12.895,40 em revisão incluem status vazios e descrições operacionais como crédito, presente, devolução ou acordo. Eles são preservados, mas não entram no faturamento até decisão humana.
 
-Possíveis duplicidades também permanecem na simulação. Nenhuma foi eliminada ou carregada automaticamente.
+Possíveis duplicidades são calculadas somente quando coincidem pessoa, data, perfume, tipo, ml, valor, status e forma de pagamento. Perfumes repetidos para pessoas diferentes não são duplicidades. As 20 ocorrências permanecem na simulação e nenhuma foi eliminada automaticamente.

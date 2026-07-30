@@ -20,23 +20,28 @@ const status = (v) => {
   if (x.includes('aguard') || x.includes('pendente') || x.includes('nao pago')) return 'pending'
   return 'unknown'
 }
+const isOperationalClientLabel = (v) => ['disponivel para venda'].includes(normalize(v))
 const rows = source.filter((r) => Object.values(r).some((v) => v !== null && String(v).trim())).filter((r)=>normalize(r.CLIENTE)!=='total:')
 const seen = new Set()
 let duplicates = 0
 const parsed = rows.map((r) => {
   const rawClient=String(r.CLIENTE??'').replace(/\s+/g,' ').trim(), client = normalize(r.CLIENTE), saleDate = date(r.DATA), amount = money(r.VALOR), paymentStatus = status(r.PAGAMENTO)
-  const sig = [client,saleDate,amount,paymentStatus,path.basename(input)].join('|')
+  const sig = [
+    client,saleDate,normalize(r.PERFUME),normalize(r.TIPO),normalize(r.ML),
+    amount,normalize(r.PAGAMENTO),normalize(r['FORMA DE PAGAMENTO']),path.basename(input)
+  ].join('|')
   const duplicate = seen.has(sig); if (duplicate) duplicates++
   seen.add(sig)
-  const importable = Boolean(client && amount !== null && amount >= 0)
+  const operationalLabel=isOperationalClientLabel(client)
+  const importable = Boolean(client && !operationalLabel && amount !== null && amount >= 0)
   const accountable = Boolean(importable && saleDate && paymentStatus !== 'unknown' && paymentStatus !== 'cancelled')
   const warnings = [!saleDate&&'invalid_date',paymentStatus==='unknown'&&'unknown_status',!String(r['FORMA DE PAGAMENTO']??'').trim()&&'unknown_payment_method',duplicate&&'possible_duplicate'].filter(Boolean)
-  const blockers = [!client&&'missing_client',(amount===null||amount<0)&&'invalid_amount'].filter(Boolean)
-  return { rawClient, client, saleDate, amount: amount ?? 0, hasNumericAmount:amount!==null, paymentStatus, rawStatus:String(r.PAGAMENTO??'').trim()||'(vazio)', paymentMethod: String(r['FORMA DE PAGAMENTO'] ?? '').trim() || 'Não informado', importable, accountable, warnings, blockers, duplicate }
+  const blockers = [!client&&'missing_client',operationalLabel&&'operational_label',(amount===null||amount<0)&&'invalid_amount'].filter(Boolean)
+  return { rawClient, client, saleDate, amount: amount ?? 0, hasNumericAmount:amount!==null, operationalLabel, paymentStatus, rawStatus:String(r.PAGAMENTO??'').trim()||'(vazio)', paymentMethod: String(r['FORMA DE PAGAMENTO'] ?? '').trim() || 'Não informado', importable, accountable, warnings, blockers, duplicate }
 })
 const validRows = parsed.filter((r) => r.importable)
 const accountableRows = parsed.filter((r)=>r.accountable)
-const clientRows = parsed.filter((r)=>r.client)
+const clientRows = parsed.filter((r)=>r.client&&!r.operationalLabel)
 const sum = (items) => Math.round(items.reduce((a,b)=>a+b.amount,0)*100)/100
 const group = (key, value = () => 1, items=validRows) => Object.entries(items.reduce((acc,r)=>{const k=key(r);acc[k]=(acc[k]||0)+value(r);return acc},{})).map(([name,v])=>({name,value:Math.round(v*100)/100})).sort((a,b)=>b.value-a.value)
 const monthlyRaw = group((r)=>r.saleDate.slice(0,7),(r)=>r.amount,accountableRows).sort((a,b)=>a.name.localeCompare(b.name))
@@ -57,6 +62,8 @@ const report = {
   valid:validRows.length, rejected:rows.length-validRows.length, duplicates,
   warningRows:parsed.filter((r)=>r.warnings.length).length,
   impossibleRows:parsed.filter((r)=>r.blockers.length).length,
+  operationalRows:parsed.filter((r)=>r.operationalLabel).length,
+  operationalValue:sum(parsed.filter((r)=>r.operationalLabel)),
   possibleClientDuplicateGroups:[...clientVariantMap.values()].filter((variants)=>variants.size>1).length,
   uniqueClients:new Set(clientRows.map((r)=>r.client)).size,
   rowsWithClient:parsed.filter((r)=>r.client).length, rowsWithNumericValue:parsed.filter((r)=>r.hasNumericAmount).length,
@@ -75,7 +82,7 @@ const report = {
     unstandardized_status:{lines:partition.review.length,value:sum(partition.review)},
     invalid_or_missing_date:{lines:validRows.filter((r)=>!r.saleDate).length,value:sum(validRows.filter((r)=>!r.saleDate))},
     possible_duplicate:{lines:validRows.filter((r)=>r.duplicate).length,value:sum(validRows.filter((r)=>r.duplicate))},
-    missing_value:{lines:parsed.filter((r)=>r.client&&!r.importable).length,value:0},
+    missing_value:{lines:parsed.filter((r)=>r.client&&!r.operationalLabel&&!r.hasNumericAmount).length,value:0},
     dashboard_accounted:{lines:accountableRows.length,value:sum(accountableRows)},
     excluded_from_revenue:{lines:partition.cancelled.length+partition.review.length,value:sum([...partition.cancelled,...partition.review])},
     impossible_without_client:{lines:parsed.filter((r)=>!r.client&&r.hasNumericAmount).length,value:sum(parsed.filter((r)=>!r.client&&r.hasNumericAmount))},

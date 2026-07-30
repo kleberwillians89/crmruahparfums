@@ -42,6 +42,9 @@ export const normalizeClient = (value: unknown) =>
   String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\s+/g, ' ').trim().toLowerCase()
 
+export const isOperationalClientLabel = (value: unknown) =>
+  ['disponivel para venda'].includes(normalizeClient(value))
+
 export function parseBrazilianMoney(value: unknown): number | null {
   if (typeof value === 'number') return Number.isFinite(value) ? value : null
   if (!String(value ?? '').trim()) return null
@@ -85,10 +88,21 @@ export function parseRows(fileName: string, sheets: string[], sheetName: string,
     const amount = parseBrazilianMoney(source.VALOR)
     const paymentStatus = normalizeStatus(source.PAGAMENTO)
     const paymentMethod = String(source['FORMA DE PAGAMENTO'] ?? '').trim()
-    const sig = signature([normalizedClient, date, amount, normalizeClient(source.PAGAMENTO), fileName])
+    const sig = signature([
+      normalizedClient,
+      date,
+      normalizeClient(source.PERFUME),
+      normalizeClient(source.TIPO),
+      normalizeClient(source.ML),
+      amount,
+      normalizeClient(source.PAGAMENTO),
+      normalizeClient(source['FORMA DE PAGAMENTO']),
+      fileName,
+    ])
     const warnings: string[] = []
     const blockers: string[] = []
     if (!client) blockers.push('Cliente ausente')
+    if (isOperationalClientLabel(client)) blockers.push('Rótulo operacional, não é cliente')
     if (amount === null || amount < 0) blockers.push('Valor inválido ou ausente')
     if (!date) warnings.push('Data inválida ou ausente')
     if (paymentStatus === 'unknown') warnings.push('Status em revisão')

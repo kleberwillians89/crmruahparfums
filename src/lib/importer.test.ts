@@ -40,12 +40,28 @@ describe('importação', () => {
     }
   })
   it('sinaliza duplicidade sem excluir nenhuma venda', () => {
-    const header = ['CLIENTE','DATA','VALOR','PAGAMENTO','FORMA DE PAGAMENTO']
-    const row = ['CLIENTE TESTE',new Date('2026-07-01'),100,'PAGO','PIX']
+    const header = ['CLIENTE','DATA','PERFUME','TIPO','ML','VALOR','PAGAMENTO','FORMA DE PAGAMENTO']
+    const row = ['CLIENTE TESTE',new Date('2026-07-01'),'PERFUME A','SPLIT',5,100,'PAGO','PIX']
     const preview = parseRows('teste.xlsx',['PERFUMES'],'PERFUMES',[header,row,row])
     expect(preview.valid).toBe(2)
     expect(preview.duplicates).toBe(1)
     expect(preview.rows[1].isDuplicate).toBe(true)
+  })
+  it('não trata perfume repetido para pessoas diferentes como duplicidade', () => {
+    const preview = parseRows('teste.xlsx',['PERFUMES'],'PERFUMES',[
+      ['CLIENTE','DATA','PERFUME','TIPO','ML','VALOR','PAGAMENTO','FORMA DE PAGAMENTO'],
+      ['PESSOA UM',new Date('2026-07-01'),'PERFUME A','SPLIT',5,100,'PAGO','PIX'],
+      ['PESSOA DOIS',new Date('2026-07-01'),'PERFUME A','SPLIT',5,100,'PAGO','PIX'],
+    ])
+    expect(preview.duplicates).toBe(0)
+  })
+  it('não trata perfumes diferentes da mesma pessoa como duplicidade', () => {
+    const preview = parseRows('teste.xlsx',['PERFUMES'],'PERFUMES',[
+      ['CLIENTE','DATA','PERFUME','TIPO','ML','VALOR','PAGAMENTO','FORMA DE PAGAMENTO'],
+      ['PESSOA UM',new Date('2026-07-01'),'PERFUME A','SPLIT',5,100,'PAGO','PIX'],
+      ['PESSOA UM',new Date('2026-07-01'),'PERFUME B','SPLIT',5,100,'PAGO','PIX'],
+    ])
+    expect(preview.duplicates).toBe(0)
   })
   it('cria o cliente comercial mesmo sem telefone', () => {
     const preview = parseRows('teste.xlsx',['PERFUMES'],'PERFUMES',[
@@ -54,5 +70,13 @@ describe('importação', () => {
     ])
     expect(preview.uniqueClients).toBe(1)
     expect(preview.rows[0].client).toBe('CLIENTE SEM CONTATO')
+  })
+  it('não cria cliente para rótulo de estoque disponível', () => {
+    const preview = parseRows('teste.xlsx',['PERFUMES'],'PERFUMES',[
+      ['CLIENTE','DATA','PERFUME','TIPO','ML','VALOR','PAGAMENTO'],
+      ['DISPONÍVEL PARA VENDA',new Date('2026-07-01'),'PERFUME A','SPLIT',5,100,'AGUARDANDO'],
+    ])
+    expect(preview.valid).toBe(0)
+    expect(preview.rows[0].blockers).toContain('Rótulo operacional, não é cliente')
   })
 })

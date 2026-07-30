@@ -146,7 +146,21 @@ export async function askIntelligence(question:string,period:PeriodValue) {
   const {data,error}=await supabase!.functions.invoke('ask-intelligence',{body:{
     organization_id:organizationId,question,period_start:period.start,period_end:period.end,
   }})
-  if(error)throw new Error('A inteligência está temporariamente indisponível.')
+  if(error){
+    const response=(error as {context?:Response}).context
+    let code=''
+    try{code=String((await response?.clone().json())?.error?.code??'')}catch{/* resposta sem JSON */}
+    const messages:Record<string,string>={
+      unauthorized:'Sua sessão expirou. Entre novamente para continuar.',
+      rate_limit:'O limite de análises foi atingido. Aguarde um minuto.',
+      ai_failed:'A OpenAI não conseguiu concluir a análise agora.',
+      ai_timeout:'A análise excedeu o tempo esperado. Tente novamente.',
+      ai_unavailable:'O serviço de inteligência não está configurado.',
+      metrics_error:'Não foi possível preparar os agregados comerciais.',
+      origin_forbidden:'Esta origem não está autorizada a acessar a inteligência.',
+    }
+    throw new Error(messages[code]??(response?'A inteligência retornou um erro interno.':'Falha de conexão com a inteligência.'))
+  }
   if(data?.error)throw new Error(data.error.message)
   return data.data
 }
@@ -230,4 +244,50 @@ export async function searchClients(term: string) {
   const { organizationId } = await currentOrganization()
   const { data } = await supabase!.from('clients').select('id,name').eq('organization_id', organizationId).ilike('name', `%${term}%`).limit(8)
   return data ?? []
+}
+
+export type InventorySummary = {
+  items:number;available_ml:number;healthy:number;low:number;critical:number
+  out_of_stock:number;consumed_ml:number;movements:number
+}
+export type InventoryRow = {
+  item_id:string;perfume_id:string;perfume:string;available_ml:number;minimum_ml:number
+  status:string;sold_ml:number;monthly_average:number;estimated_days:number|null;last_movement:string|null
+}
+
+export async function fetchInventory(period:PeriodValue) {
+  const {organizationId}=await authenticatedOrganization()
+  const [summary,rows]=await Promise.all([
+    supabase!.rpc('inventory_summary',{org_id:organizationId,start_date:period.start,end_date:period.end}),
+    supabase!.rpc('inventory_rows',{org_id:organizationId,start_date:period.start,end_date:period.end}),
+  ])
+  if(summary.error)throw new Error(summary.error.message)
+  if(rows.error)throw new Error(rows.error.message)
+  return {summary:summary.data as InventorySummary,rows:(rows.data??[]) as InventoryRow[]}
+}
+
+export async function inventoryPerfumes() {
+  const {organizationId}=await currentOrganization()
+  const {data,error}=await supabase!.from('perfumes').select('id,full_name_raw,normalized_name').eq('organization_id',organizationId).order('full_name_raw')
+  if(error)throw new Error(error.message)
+  return data??[]
+}
+
+export async function createInventoryItem(input:{perfumeId:string;openingMl:number;minimumMl:number;referenceDate:string;notes:string}) {
+  const {organizationId}=await currentOrganization()
+  const {data,error}=await supabase!.rpc('inventory_create_item',{
+    p_organization_id:organizationId,p_perfume_id:input.perfumeId,p_opening_ml:input.openingMl,
+    p_minimum_ml:input.minimumMl,p_reference_date:input.referenceDate,p_notes:input.notes||null,
+  })
+  if(error)throw new Error(error.message)
+  return data
+}
+
+export async function adjustInventory(itemId:string,quantity:number,reason:string,notes='') {
+  const movementType=quantity>0?'entry':'negative_adjustment'
+  const {data,error}=await supabase!.rpc('inventory_apply',{
+    p_item_id:itemId,p_quantity_ml:quantity,p_type:movementType,p_reason:reason,p_notes:notes||null,p_sale_id:null,
+  })
+  if(error)throw new Error(error.message)
+  return data
 }

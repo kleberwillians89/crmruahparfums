@@ -4,6 +4,7 @@ import { AuthRoot } from './Auth'
 import './styles.css'
 import './enhancements.css'
 import './auth.css'
+import './mugo.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode><AuthRoot /></StrictMode>,

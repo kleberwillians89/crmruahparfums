@@ -7,33 +7,34 @@ const sha256 = async (value: string) => {
 
 Deno.serve(async (req) => {
   const startedAt = Date.now()
+  const respond = (body: unknown, status = 200) => json(body, status, req)
   const ctx = await context(req)
   if ('response' in ctx) return ctx.response
   const { client, user, body, organizationId, role } = ctx
   const question = String(body.question ?? '').trim().slice(0, 1000)
   const start = String(body.period_start ?? ''), end = String(body.period_end ?? '')
   if (!question || !/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end) || end < start) {
-    return json({ error: { code: 'invalid_payload', message: 'Pergunta e período válidos são obrigatórios.' } }, 400)
+    return respond({ error: { code: 'invalid_payload', message: 'Pergunta e período válidos são obrigatórios.' } }, 400)
   }
   if (!['admin','manager','operator','viewer'].includes(role)) {
-    return json({ error: { code: 'forbidden', message: 'Perfil sem acesso à inteligência.' } }, 403)
+    return respond({ error: { code: 'forbidden', message: 'Perfil sem acesso à inteligência.' } }, 403)
   }
   const since = new Date(Date.now() - 60_000).toISOString()
   const { count } = await client.from('ai_runs').select('id', { count:'exact', head:true })
     .eq('user_id', user.id).gte('created_at', since)
-  if ((count ?? 0) >= 5) return json({ error: { code:'rate_limit', message:'Limite de análises atingido. Aguarde um minuto.' } }, 429)
+  if ((count ?? 0) >= 5) return respond({ error: { code:'rate_limit', message:'Limite de análises atingido. Aguarde um minuto.' } }, 429)
 
   const requestHash = await sha256(`${user.id}|${organizationId}|${start}|${end}|${question.toLowerCase()}`)
   const { data: duplicate } = await client.from('ai_runs').select('id').eq('user_id', user.id)
     .eq('request_hash', requestHash).gte('created_at', since).limit(1).maybeSingle()
-  if (duplicate) return json({ error:{ code:'duplicate_request', message:'Esta análise já está em processamento.' } }, 409)
+  if (duplicate) return respond({ error:{ code:'duplicate_request', message:'Esta análise já está em processamento.' } }, 409)
 
   const { data: metrics, error } = await client.rpc('ai_authorized_aggregates', {
     org_id: organizationId, start_date: start, end_date: end,
   })
-  if (error) return json({ error: { code: 'metrics_error', message: 'Não foi possível calcular as métricas autorizadas.' } }, 500)
+  if (error) return respond({ error: { code: 'metrics_error', message: 'Não foi possível calcular as métricas autorizadas.' } }, 500)
   if (!metrics || Number(metrics.sales ?? 0) === 0) {
-    return json({ data: {
+    return respond({ data: {
       resumo:'Não existem informações suficientes no período selecionado.',
       evidencias:[],metricas_utilizadas:metrics??{},insights:[],alertas:['Período sem vendas.'],
       recomendacoes:['Selecione outro período.'],proximas_acoes:['Revisar o filtro de datas.'],
@@ -47,7 +48,7 @@ Deno.serve(async (req) => {
   const apiKey = Deno.env.get('OPENAI_API_KEY')
   if (!apiKey) {
     await client.from('ai_runs').update({status:'failed',error_code:'missing_ai_key',duration_ms:Date.now()-startedAt,completed_at:new Date().toISOString()}).eq('id',run.data?.id)
-    return json({ error:{ code:'ai_unavailable',message:'A inteligência está temporariamente indisponível.' } },503)
+    return respond({ error:{ code:'ai_unavailable',message:'A inteligência está temporariamente indisponível.' } },503)
   }
   let response: Response
   try {
@@ -77,17 +78,17 @@ Deno.serve(async (req) => {
     })
   } catch {
     await client.from('ai_runs').update({status:'failed',error_code:'timeout',duration_ms:Date.now()-startedAt,completed_at:new Date().toISOString()}).eq('id',run.data?.id)
-    return json({error:{code:'ai_timeout',message:'A inteligência demorou mais que o esperado. Tente novamente.'}},504)
+    return respond({error:{code:'ai_timeout',message:'A inteligência demorou mais que o esperado. Tente novamente.'}},504)
   }
   if (!response.ok) {
     await client.from('ai_runs').update({status:'failed',error_code:'provider_error',duration_ms:Date.now()-startedAt,completed_at:new Date().toISOString()}).eq('id',run.data?.id)
-    return json({error:{code:'ai_failed',message:'A análise não pôde ser concluída agora.'}},502)
+    return respond({error:{code:'ai_failed',message:'A análise não pôde ser concluída agora.'}},502)
   }
   const raw=await response.json()
   let answer:unknown
   try { answer=JSON.parse(raw.output_text) } catch {
     await client.from('ai_runs').update({status:'failed',error_code:'invalid_output',duration_ms:Date.now()-startedAt,completed_at:new Date().toISOString()}).eq('id',run.data?.id)
-    return json({error:{code:'invalid_ai_output',message:'A resposta não passou na validação de segurança.'}},502)
+    return respond({error:{code:'invalid_ai_output',message:'A resposta não passou na validação de segurança.'}},502)
   }
   await client.from('ai_runs').update({
     status:'completed',model:raw.model,duration_ms:Date.now()-startedAt,
@@ -97,5 +98,5 @@ Deno.serve(async (req) => {
   await audit(client,organizationId,user.id,'ai_question','ai_run',run.data?.id,{
     period_start:start,period_end:end,metric_keys:Object.keys(metrics),duration_ms:Date.now()-startedAt,
   })
-  return json({data:answer})
+  return respond({data:answer})
 })

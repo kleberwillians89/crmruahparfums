@@ -1,7 +1,7 @@
 import { ChangeEvent, ReactNode, useEffect, useMemo, useState } from 'react'
 import {
   Bell, Bot, CalendarDays, ChartNoAxesCombined, Check, ChevronDown, CircleHelp,
-  Clock3, Download, FileSpreadsheet, FileText, Home, Import, Lightbulb, Menu,
+  Boxes, Clock3, Download, FileSpreadsheet, FileText, Home, Import, Lightbulb, Menu,
   MoreHorizontal, Plus, Search, Settings, ShoppingBag, Sparkles, TrendingUp,
   Truck, UploadCloud, UserRound, UsersRound, X, AlertTriangle, ArrowUpRight,
 } from 'lucide-react'
@@ -15,19 +15,20 @@ import { PeriodFilter } from './components/PeriodFilter'
 import { defaultPeriod, PeriodValue } from './lib/period'
 import {
   CommercialSale, PeriodSummary, SaleFilters,
-  askIntelligence, fetchClientPeriodSummaries, fetchDeliveryRows,
-  fetchPeriodSummary, fetchSalesPage, updateShipment,
+  adjustInventory, askIntelligence, createInventoryItem, fetchClientPeriodSummaries, fetchDeliveryRows,
+  fetchInventory, fetchPeriodSummary, fetchSalesPage, inventoryPerfumes, InventoryRow, InventorySummary, updateShipment,
 } from './lib/records'
 
-type Page = 'Visão Geral'|'Clientes'|'Vendas'|'Entregas'|'Relatórios'|'Importação'|'IA'|'Insights'|'Configurações'
+type Page = 'Visão Geral'|'Clientes'|'Vendas'|'Entregas'|'Estoque'|'Relatórios'|'Importação'|'IA'|'Insights'|'Configurações'
 const navigation: { label: Page; icon: typeof Home }[] = [
   { label: 'Visão Geral', icon: Home }, { label: 'Clientes', icon: UsersRound },
   { label: 'Vendas', icon: ShoppingBag }, { label: 'Entregas', icon: Truck },
+  { label: 'Estoque', icon: Boxes },
   { label: 'Relatórios', icon: FileText }, { label: 'Importação', icon: Import },
   { label: 'IA', icon: Sparkles }, { label: 'Insights', icon: Lightbulb },
   { label: 'Configurações', icon: Settings },
 ]
-const routes:Record<Page,string>={'Visão Geral':'/','Clientes':'/clientes','Vendas':'/vendas','Entregas':'/entregas','Relatórios':'/relatorios','Importação':'/importacao','IA':'/ia','Insights':'/insights','Configurações':'/configuracoes'}
+const routes:Record<Page,string>={'Visão Geral':'/','Clientes':'/clientes','Vendas':'/vendas','Entregas':'/entregas','Estoque':'/estoque','Relatórios':'/relatorios','Importação':'/importacao','IA':'/ia','Insights':'/insights','Configurações':'/configuracoes'}
 const pageFromPath=()=>Object.entries(routes).find(([,path])=>path===location.pathname)?.[0] as Page||'Visão Geral'
 
 const statusLabel: Record<string, string> = { paid: 'Pago', pending: 'Aguardando', cancelled: 'Cancelado', unknown: 'Desconhecido' }
@@ -207,7 +208,7 @@ function PreviewRow({ row }: { row: ParsedSale }) {
 }
 
 function Intelligence({period,setPeriod}:{period:PeriodValue;setPeriod:(value:PeriodValue)=>void}) {
-  const suggestions = ['Quanto faturamos neste mês?', 'Quais oportunidades comerciais existem?', 'Como está a qualidade dos dados?', 'Que ação devemos priorizar agora?']
+  const suggestions = ['Como estão as vendas deste mês?', 'Quanto ainda está aguardando?', 'Quais entregas estão atrasadas?', 'Quais perfumes estão acabando?', 'O que devo repor primeiro?', 'Existem vendas sem estoque suficiente?']
   const [question,setQuestion]=useState(''),[answer,setAnswer]=useState<Record<string,unknown>|null>(null),[loading,setLoading]=useState(false),[error,setError]=useState('')
   const submit=async(text=question)=>{if(!text.trim()||loading)return;setLoading(true);setError('');try{setAnswer(await askIntelligence(text,period));setQuestion(text)}catch(err){setError(err instanceof Error?err.message:'A inteligência está indisponível.')}finally{setLoading(false)}}
   return <div className="page intelligence-page"><div className="page-lead"><div><h2>RUAH Intelligence</h2><p>Análise consultiva baseada apenas em agregados reais.</p></div><PeriodFilter value={period} onApply={setPeriod}/></div>
@@ -348,6 +349,28 @@ function ReportsPage({period,setPeriod}:{period:PeriodValue;setPeriod:(value:Per
   </div>
 }
 
+function InventoryPage({period,setPeriod}:{period:PeriodValue;setPeriod:(value:PeriodValue)=>void}) {
+  const [summary,setSummary]=useState<InventorySummary|null>(null),[rows,setRows]=useState<InventoryRow[]>([])
+  const [loading,setLoading]=useState(true),[error,setError]=useState(''),[showCreate,setShowCreate]=useState(false)
+  const reload=()=>{setLoading(true);fetchInventory(period).then((result)=>{setSummary(result.summary);setRows(result.rows);setError('')}).catch((reason)=>setError(reason instanceof Error?reason.message:'Não foi possível carregar o estoque.')).finally(()=>setLoading(false))}
+  useEffect(()=>{fetchInventory(period).then((result)=>{setSummary(result.summary);setRows(result.rows);setError('')}).catch((reason)=>setError(reason instanceof Error?reason.message:'Não foi possível carregar o estoque.')).finally(()=>setLoading(false))},[period])
+  const adjust=async(row:InventoryRow,positive:boolean)=>{const raw=prompt(`${positive?'Entrada':'Ajuste negativo'} em ML para ${row.perfume}:`);if(!raw)return;const amount=Number(raw.replace(',','.'));if(!Number.isFinite(amount)||amount<=0)return alert('Informe uma quantidade válida.');const reason=prompt('Motivo obrigatório:')?.trim();if(!reason)return;if(!positive&&!confirm(`Confirma retirar ${amount} ML de ${row.perfume}?`))return;try{await adjustInventory(row.item_id,positive?amount:-amount,reason);reload()}catch(reason){alert(reason instanceof Error?reason.message:'Não foi possível registrar o movimento.')}}
+  return <div className="page">
+    {showCreate&&<InventoryCreate close={()=>setShowCreate(false)} saved={()=>{setShowCreate(false);reload()}}/>}
+    <div className="page-lead"><div><h2>Estoque</h2><p>Saldo em ML e movimentações integradas às novas vendas.</p></div><div className="page-actions"><PeriodFilter value={period} onApply={setPeriod}/><button className="primary" onClick={()=>setShowCreate(true)}><Plus/> Cadastrar perfume</button></div></div>
+    {summary&&<section className="metrics"><Metric label="Perfumes cadastrados" value={integer(summary.items)} detail={`${Number(summary.available_ml).toLocaleString('pt-BR')} ML disponíveis`} icon={Boxes}/><Metric label="Estoque saudável" value={integer(summary.healthy)} detail={`${integer(summary.low)} em nível baixo`} icon={Check}/><Metric label="Críticos e esgotados" value={integer(summary.critical+summary.out_of_stock)} detail={`${integer(summary.out_of_stock)} sem saldo`} icon={AlertTriangle}/><Metric label="Consumo no período" value={`${Number(summary.consumed_ml).toLocaleString('pt-BR')} ML`} detail={`${integer(summary.movements)} movimentações`} icon={TrendingUp}/></section>}
+    {error?<div className="notice"><AlertTriangle/><span>{error}</span></div>:loading?<div className="empty card"><h3>Carregando estoque…</h3></div>:rows.length===0?<div className="empty card"><Boxes/><h3>Estoque pronto para começar</h3><p>Cadastre o saldo de um perfume. As 5.892 vendas históricas não serão abatidas retroativamente.</p><button className="primary" onClick={()=>setShowCreate(true)}>Cadastrar primeiro perfume</button></div>:<div className="card clients-table"><div className="clients-caption"><strong>{integer(rows.length)} perfumes controlados</strong><button onClick={()=>exportCsv('estoque-ruah.csv',rows as unknown as Record<string,unknown>[])}><Download/> Exportar</button></div><div className="table-wrap"><table><thead><tr><th>Perfume</th><th>Saldo</th><th>Limite mínimo</th><th>Status</th><th>ML vendidos</th><th>Consumo 30 dias</th><th>Estimativa</th><th>Última movimentação</th><th>Ações</th></tr></thead><tbody>{rows.map((row)=><tr key={row.item_id}><td><strong>{row.perfume}</strong></td><td>{Number(row.available_ml).toLocaleString('pt-BR')} ML</td><td>{Number(row.minimum_ml).toLocaleString('pt-BR')} ML</td><td><span className={`badge ${row.status==='Saudável'?'paid':row.status==='Baixo'?'pending':'cancelled'}`}>{row.status}</span></td><td>{Number(row.sold_ml).toLocaleString('pt-BR')} ML</td><td>{Number(row.monthly_average).toLocaleString('pt-BR')} ML</td><td>{row.estimated_days?`${row.estimated_days} dias`:'—'}</td><td>{row.last_movement?new Date(row.last_movement).toLocaleString('pt-BR'):'—'}</td><td><button onClick={()=>adjust(row,true)}>Entrada</button><button onClick={()=>adjust(row,false)}>Ajustar</button></td></tr>)}</tbody></table></div></div>}
+  </div>
+}
+
+function InventoryCreate({close,saved}:{close:()=>void;saved:()=>void}) {
+  const [perfumes,setPerfumes]=useState<{id:string;full_name_raw:string}[]>([]),[perfumeId,setPerfumeId]=useState('')
+  const [opening,setOpening]=useState(''),[minimum,setMinimum]=useState(''),[reference,setReference]=useState(format(new Date(),'yyyy-MM-dd')),[notes,setNotes]=useState(''),[error,setError]=useState(''),[saving,setSaving]=useState(false)
+  useEffect(()=>{inventoryPerfumes().then((data)=>setPerfumes(data))},[])
+  const submit=async()=>{const openingMl=Number(opening.replace(',','.')),minimumMl=Number(minimum.replace(',','.'));if(!perfumeId||!Number.isFinite(openingMl)||openingMl<0||!Number.isFinite(minimumMl)||minimumMl<0||!reference)return setError('Preencha perfume, saldos e data corretamente.');setSaving(true);try{await createInventoryItem({perfumeId,openingMl,minimumMl,referenceDate:reference,notes});saved()}catch(reason){setError(reason instanceof Error?reason.message:'Não foi possível cadastrar o estoque.')}finally{setSaving(false)}}
+  return <div className="modal-backdrop"><div className="modal card inventory-modal"><div className="modal-head"><div><span>CONTROLE DE ESTOQUE</span><h2>Cadastrar perfume</h2></div><button onClick={close}><X/></button></div><div className="form-grid"><label className="wide"><span>Perfume existente</span><select value={perfumeId} onChange={(event)=>setPerfumeId(event.target.value)}><option value="">Selecione…</option>{perfumes.map((perfume)=><option key={perfume.id} value={perfume.id}>{perfume.full_name_raw}</option>)}</select></label><label><span>Saldo inicial em ML</span><input inputMode="decimal" value={opening} onChange={(event)=>setOpening(event.target.value)}/></label><label><span>Limite mínimo em ML</span><input inputMode="decimal" value={minimum} onChange={(event)=>setMinimum(event.target.value)}/></label><label><span>Data de referência</span><input type="date" value={reference} onChange={(event)=>setReference(event.target.value)}/></label><label className="wide"><span>Observação</span><textarea value={notes} onChange={(event)=>setNotes(event.target.value)}/></label></div>{error&&<div className="form-error">{error}</div>}<div className="modal-actions"><button onClick={close}>Cancelar</button><button className="primary" disabled={saving} onClick={submit}>{saving?'Salvando…':'Cadastrar estoque'}</button></div></div></div>
+}
+
 export function App() {
   const [page, setPage] = useState<Page>(pageFromPath())
   const [period,setPeriod]=useState<PeriodValue>(defaultPeriod())
@@ -359,11 +382,12 @@ export function App() {
     if (page === 'Clientes') return <ClientsPage period={period} setPeriod={setPeriod}/>
     if (page === 'Vendas') return <SalesPage period={period} setPeriod={setPeriod}/>
     if (page === 'Entregas') return <DeliveriesPage period={period} setPeriod={setPeriod}/>
+    if (page === 'Estoque') return <InventoryPage period={period} setPeriod={setPeriod}/>
     if (page === 'Relatórios') return <ReportsPage period={period} setPeriod={setPeriod}/>
     if (page === 'Importação') return <ImportPage/>
     if (page === 'IA') return <Intelligence period={period} setPeriod={setPeriod}/>
     if (page === 'Insights') return <Insights period={period}/>
     return <GenericPage page={page}/>
   }, [page,period])
-  return <div className="app-shell"><Sidebar page={page} setPage={navigate} open={menuOpen} close={()=>setMenuOpen(false)}/><main><Header page={page} menu={()=>setMenuOpen(true)}/>{content}</main></div>
+  return <div className="app-shell"><Sidebar page={page} setPage={navigate} open={menuOpen} close={()=>setMenuOpen(false)}/><main><Header page={page} menu={()=>setMenuOpen(true)}/>{content}<footer className="internal-mugo-signature"><img src="/mugo-logo.png" alt="Mugô"/><span>RUAH Intelligence — desenvolvido pela Mugô</span></footer></main></div>
 }

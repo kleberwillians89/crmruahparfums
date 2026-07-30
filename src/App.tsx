@@ -1,4 +1,4 @@
-import { ChangeEvent, ReactNode, useMemo, useState } from 'react'
+import { ChangeEvent, ReactNode, useEffect, useMemo, useState } from 'react'
 import {
   Bell, Bot, CalendarDays, ChartNoAxesCombined, Check, ChevronDown, CircleHelp,
   Clock3, FileSpreadsheet, Home, Import, Lightbulb, Menu,
@@ -7,9 +7,13 @@ import {
 } from 'lucide-react'
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { brl, integer, monthLabel, shortDate } from './lib/format'
-import { ImportPreview, ParsedSale, isOperationalClientLabel, readWorkbook } from './lib/importer'
+import { ImportPreview, ParsedSale, readWorkbook } from './lib/importer'
 import report from './data/validation-report.json'
 import { ClientModal, SaleModal } from './components/RecordModals'
+import {
+  ClientCommercialSummary, CommercialSale, DashboardMetrics,
+  fetchClientSummaries, fetchDashboardMetrics, fetchSalesPage,
+} from './lib/records'
 
 type Page = 'Visão Geral' | 'Clientes' | 'Vendas' | 'Importar Dados' | 'RUAH Intelligence' | 'Insights' | 'Configurações'
 const navigation: { label: Page; icon: typeof Home }[] = [
@@ -68,10 +72,14 @@ function Metric({ label, value, detail, icon: Icon, tone = 'gold' }: { label: st
 }
 
 function Dashboard() {
-  const hasData = report.valid > 0
-  const paid = report.paid ?? 0
-  const pending = report.pending ?? 0
-  const total = paid + pending + (report.cancelled ?? 0)
+  const [live,setLive]=useState<DashboardMetrics|null>(null)
+  const [loadError,setLoadError]=useState('')
+  useEffect(()=>{fetchDashboardMetrics().then(setLive).catch(()=>setLoadError('Não foi possível consultar o Supabase.'))},[])
+  const hasData = Boolean(live?.sales)
+  const paid = Number(live?.paid ?? 0)
+  const pending = Number(live?.pending ?? 0)
+  const cancelled = Number(live?.cancelled ?? 0)
+  const total = paid + pending + cancelled
   const paymentData = report.paymentMethods.map((x: { name: string; value: number }) => x)
   const colors = ['#bf9636', '#332f29', '#817768', '#ded6c8', '#9f7c2b']
   return <div className="page">
@@ -79,22 +87,22 @@ function Dashboard() {
       <div><h2>O pulso comercial da RUAH</h2><p>Indicadores consolidados para decisões mais precisas.</p></div>
       <button className="date-filter"><CalendarDays size={17} /> Todo o período <ChevronDown size={16} /></button>
     </div>
-    {!hasData && <div className="notice"><AlertTriangle size={18} /><span>Conecte o Supabase ou importe a planilha para visualizar indicadores reais.</span></div>}
+    {loadError && <div className="notice"><AlertTriangle size={18} /><span>{loadError}</span></div>}
     <section className="metrics">
-      <Metric label="Volume bruto da base" value={hasData ? brl(report.importedValue) : '—'} detail={hasData ? `${integer(report.valid)} registros comerciais` : 'Sem dados sincronizados'} icon={ChartNoAxesCombined} />
-      <Metric label="Faturamento contabilizado" value={hasData ? brl(report.revenue) : '—'} detail={hasData ? 'Pagos + aguardando' : 'Sem dados sincronizados'} icon={TrendingUp} />
-      <Metric label="Valor pago" value={hasData ? brl(report.paid) : '—'} detail={hasData ? `${integer(report.statusCounts.find((x)=>x.name==='paid')?.value ?? 0)} vendas` : 'Aguardando importação'} icon={Check} tone="dark" />
-      <Metric label="Aguardando pagamento" value={hasData ? brl(report.pending) : '—'} detail={hasData ? `${integer(report.statusCounts.find((x)=>x.name==='pending')?.value ?? 0)} vendas` : 'Aguardando importação'} icon={Clock3} tone="sand" />
-      <Metric label="Cancelado" value={hasData ? brl(report.cancelled) : '—'} detail={hasData ? 'Fora do faturamento' : 'Aguardando importação'} icon={X} tone="cream" />
-      <Metric label="Status em revisão" value={hasData ? brl(report.reviewValue) : '—'} detail={hasData ? `${integer(report.statusCounts.find((x)=>x.name==='unknown')?.value ?? 0)} registros` : 'Aguardando importação'} icon={AlertTriangle} tone="cream" />
+      <Metric label="Volume bruto da base" value={hasData ? brl(Number(live!.raw_gross)) : '—'} detail={hasData ? `${integer(Number(live!.batch_rows))} linhas preservadas` : 'Sem dados sincronizados'} icon={ChartNoAxesCombined} />
+      <Metric label="Faturamento contabilizado" value={hasData ? brl(paid+pending) : '—'} detail={hasData ? 'Pagos + aguardando' : 'Sem dados sincronizados'} icon={TrendingUp} />
+      <Metric label="Valor pago" value={hasData ? brl(paid) : '—'} detail={hasData ? `${integer(Number(live!.paid_rows))} vendas` : 'Aguardando importação'} icon={Check} tone="dark" />
+      <Metric label="Aguardando pagamento" value={hasData ? brl(pending) : '—'} detail={hasData ? `${integer(Number(live!.pending_rows))} vendas` : 'Aguardando importação'} icon={Clock3} tone="sand" />
+      <Metric label="Cancelado" value={hasData ? brl(cancelled) : '—'} detail={hasData ? 'Fora do faturamento' : 'Aguardando importação'} icon={X} tone="cream" />
+      <Metric label="Status em revisão" value={hasData ? brl(Number(live!.review)) : '—'} detail={hasData ? `${integer(Number(live!.review_rows))} registros` : 'Aguardando importação'} icon={AlertTriangle} tone="cream" />
     </section>
     {hasData && <section className="coverage card">
-      <div><span>Cobertura financeira</span><strong>{((report.reconciliation.dashboard_accounted.lines / report.reconciliation.gross_with_client_and_value.lines) * 100).toFixed(1).replace('.',',')}%</strong></div>
-      <div><span>Total de registros</span><strong>{integer(report.rows)}</strong></div>
-      <div><span>Contabilizados</span><strong>{integer(report.reconciliation.dashboard_accounted.lines)}</strong></div>
-      <div><span>Em revisão</span><strong>{integer(report.reconciliation.unstandardized_status.lines + report.reconciliation.missing_value.lines + report.reconciliation.impossible_without_client.lines)}</strong></div>
-      <div><span>Possíveis duplicidades</span><strong>{integer(report.reconciliation.possible_duplicate.lines)}</strong></div>
-      <div><span>Última atualização</span><strong>29/07/2026</strong></div>
+      <div><span>Cobertura financeira</span><strong>{(((Number(live!.paid_rows)+Number(live!.pending_rows))/Number(live!.sales))*100).toFixed(1).replace('.',',')}%</strong></div>
+      <div><span>Total de registros</span><strong>{integer(Number(live!.batch_rows))}</strong></div>
+      <div><span>Vendas</span><strong>{integer(Number(live!.sales))}</strong></div>
+      <div><span>Estoque</span><strong>{integer(Number(live!.stock_rows))}</strong></div>
+      <div><span>Possíveis duplicidades</span><strong>{integer(Number(live!.possible_duplicates))}</strong></div>
+      <div><span>Última venda</span><strong>{live!.last_sale?shortDate(`${live!.last_sale}T12:00:00`):'—'}</strong></div>
     </section>}
     <section className="dashboard-grid">
       <div className="card chart-card">
@@ -108,9 +116,9 @@ function Dashboard() {
       <div className="card chart-card">
         <div className="card-title"><div><h3>Status dos pagamentos</h3><p>Distribuição do valor comercial</p></div></div>
         {hasData && total ? <div className="payment-chart">
-          <ResponsiveContainer width="52%" height={220}><PieChart><Pie data={[{name:'Pago',value:paid},{name:'Aguardando',value:pending},{name:'Cancelado',value:report.cancelled}]} innerRadius={67} outerRadius={88} dataKey="value" stroke="none">
+          <ResponsiveContainer width="52%" height={220}><PieChart><Pie data={[{name:'Pago',value:paid},{name:'Aguardando',value:pending},{name:'Cancelado',value:cancelled}]} innerRadius={67} outerRadius={88} dataKey="value" stroke="none">
             {[0,1,2].map((_, i)=><Cell key={i} fill={colors[i]}/>)}</Pie><Tooltip formatter={(v)=>brl(Number(v))}/></PieChart></ResponsiveContainer>
-          <div className="legend">{[['Pago',paid],['Aguardando',pending],['Cancelado',report.cancelled]].map((x,i)=><div key={String(x[0])}><i style={{background:colors[i]}}/><span>{x[0]}</span><strong>{brl(Number(x[1]))}</strong></div>)}</div>
+          <div className="legend">{[['Pago',paid],['Aguardando',pending],['Cancelado',cancelled]].map((x,i)=><div key={String(x[0])}><i style={{background:colors[i]}}/><span>{x[0]}</span><strong>{brl(Number(x[1]))}</strong></div>)}</div>
         </div> : <ChartPlaceholder />}
       </div>
       <div className="card chart-card payments">
@@ -133,7 +141,7 @@ function ChartPlaceholder({ compact = false }: { compact?: boolean }) {
   return <div className={`chart-placeholder ${compact ? 'compact' : ''}`}><ChartNoAxesCombined size={25}/><span>Aguardando dados reais</span></div>
 }
 
-function ImportPage({ onPreview }: { onPreview: (p: ImportPreview) => void }) {
+function ImportPage() {
   const [preview, setPreview] = useState<ImportPreview | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -143,7 +151,7 @@ function ImportPage({ onPreview }: { onPreview: (p: ImportPreview) => void }) {
     setLoading(true); setError('')
     try {
       const result = await readWorkbook(file)
-      setPreview(result.preview); onPreview(result.preview)
+      setPreview(result.preview)
     } catch { setError('Não foi possível ler o arquivo. Verifique o formato e tente novamente.') }
     finally { setLoading(false) }
   }
@@ -229,37 +237,34 @@ function GenericPage({ page }: { page: Page }) {
   </div>
 }
 
-type ClientSummary = {
-  name:string; total:number; paid:number; pending:number; cancelled:number; review:number
-  items:number; first:string; last:string
-}
-
-function ClientsPage({ preview, openImport }: { preview:ImportPreview|null; openImport:()=>void }) {
+function ClientsPage() {
   const [modal,setModal]=useState(false)
-  const clients=useMemo(()=>{
-    if(!preview)return []
-    const grouped=new Map<string,ClientSummary>()
-    for(const row of preview.rows){
-      if(!row.normalizedClient||isOperationalClientLabel(row.client))continue
-      const current=grouped.get(row.normalizedClient)??{name:row.client,total:0,paid:0,pending:0,cancelled:0,review:0,items:0,first:'',last:''}
-      if(row.amount!==null){
-        current.total+=row.amount;current.items+=1
-        if(row.paymentStatus==='paid')current.paid+=row.amount
-        else if(row.paymentStatus==='pending')current.pending+=row.amount
-        else if(row.paymentStatus==='cancelled')current.cancelled+=row.amount
-        else current.review+=row.amount
-      }
-      if(row.date){if(!current.first||row.date<current.first)current.first=row.date;if(!current.last||row.date>current.last)current.last=row.date}
-      grouped.set(row.normalizedClient,current)
-    }
-    return [...grouped.values()].sort((a,b)=>b.paid-a.paid||a.name.localeCompare(b.name,'pt-BR'))
-  },[preview])
+  const [clients,setClients]=useState<ClientCommercialSummary[]>([])
+  const [loading,setLoading]=useState(true)
+  const [error,setError]=useState('')
+  useEffect(()=>{fetchClientSummaries().then(setClients).catch(()=>setError('Não foi possível consultar os clientes.')).finally(()=>setLoading(false))},[])
   return <div className="page">{modal&&<ClientModal close={()=>setModal(false)}/>}
     <div className="page-lead"><div><h2>Clientes</h2><p>Relacionamento, recorrência e histórico em um só lugar.</p></div><button className="primary" onClick={()=>setModal(true)}><Plus size={17}/> Adicionar cliente</button></div>
-    {!preview?<div className="empty card"><div className="empty-icon"><UserRound/></div><h3>Carregue a planilha para revisar os 418 clientes</h3><p>O dry-run é local e não grava dados no Supabase.</p><button className="primary" onClick={openImport}><Import size={17}/> Abrir importação</button></div>:
-    <div className="card clients-table"><div className="clients-caption"><div><strong>{integer(clients.length)} clientes no dry-run</strong><span>Ordenados por valor pago, do maior para o menor</span></div><span className="badge pending">SIMULAÇÃO</span></div>
+    {loading?<div className="empty card"><h3>Carregando clientes do Supabase…</h3></div>:error?<div className="notice"><AlertTriangle size={18}/><span>{error}</span></div>:
+    <div className="card clients-table"><div className="clients-caption"><div><strong>{integer(clients.length)} clientes</strong><span>Ordenados por valor pago, do maior para o menor</span></div><span className="live-dot">SUPABASE</span></div>
       <div className="table-wrap"><table><thead><tr><th>Cliente</th><th>Total comprado</th><th>Pago</th><th>Aguardando</th><th>Cancelado</th><th>Em revisão</th><th>Itens</th><th>Ticket médio</th><th>Primeira compra</th><th>Última compra</th></tr></thead>
-      <tbody>{clients.map((c)=><tr key={c.name}><td><strong>{c.name}</strong></td><td>{brl(c.total)}</td><td>{brl(c.paid)}</td><td>{brl(c.pending)}</td><td>{brl(c.cancelled)}</td><td>{brl(c.review)}</td><td>{integer(c.items)}</td><td>{brl(c.items?c.total/c.items:0)}</td><td>{c.first?shortDate(`${c.first}T12:00:00`):'—'}</td><td>{c.last?shortDate(`${c.last}T12:00:00`):'—'}</td></tr>)}</tbody></table></div>
+      <tbody>{clients.map((c)=><tr key={c.client_id}><td><strong>{c.client}</strong></td><td>{brl(Number(c.total_purchased))}</td><td>{brl(Number(c.paid))}</td><td>{brl(Number(c.pending))}</td><td>{brl(Number(c.cancelled))}</td><td>{brl(Number(c.review))}</td><td>{integer(Number(c.item_count))}</td><td>{brl(Number(c.average_ticket))}</td><td>{c.first_purchase?shortDate(`${c.first_purchase}T12:00:00`):'—'}</td><td>{c.last_purchase?shortDate(`${c.last_purchase}T12:00:00`):'—'}</td></tr>)}</tbody></table></div>
+    </div>}
+  </div>
+}
+
+function SalesPage() {
+  const [modal,setModal]=useState(false)
+  const [sales,setSales]=useState<CommercialSale[]>([])
+  const [count,setCount]=useState(0)
+  const [error,setError]=useState('')
+  useEffect(()=>{fetchSalesPage().then((result)=>{setSales(result.rows);setCount(result.count)}).catch(()=>setError('Não foi possível consultar as vendas.'))},[])
+  return <div className="page">{modal&&<SaleModal close={()=>setModal(false)}/>}
+    <div className="page-lead"><div><h2>Vendas</h2><p>Dados consultados diretamente no Supabase.</p></div><button className="primary" onClick={()=>setModal(true)}><Plus size={17}/> Adicionar venda</button></div>
+    {error?<div className="notice"><AlertTriangle size={18}/><span>{error}</span></div>:
+    <div className="card clients-table"><div className="clients-caption"><div><strong>{integer(count)} vendas</strong><span>Exibindo as 200 mais recentes</span></div><span className="live-dot">SUPABASE</span></div>
+      <div className="table-wrap"><table><thead><tr><th>Data</th><th>Cliente</th><th>Valor</th><th>Status</th><th>Pagamento</th></tr></thead>
+      <tbody>{sales.map((sale)=><tr key={sale.id}><td>{sale.sale_date?shortDate(`${sale.sale_date}T12:00:00`):'—'}</td><td><strong>{sale.clients?.name??sale.original_client??'—'}</strong></td><td>{brl(Number(sale.amount))}</td><td><span className={`badge ${sale.payment_status}`}>{statusLabel[sale.payment_status]}</span></td><td>{sale.payment_method??'—'}</td></tr>)}</tbody></table></div>
     </div>}
   </div>
 }
@@ -267,14 +272,14 @@ function ClientsPage({ preview, openImport }: { preview:ImportPreview|null; open
 export function App() {
   const [page, setPage] = useState<Page>('Visão Geral')
   const [menuOpen, setMenuOpen] = useState(false)
-  const [preview, setPreview] = useState<ImportPreview | null>(null)
   const content = useMemo<ReactNode>(() => {
     if (page === 'Visão Geral') return <Dashboard/>
-    if (page === 'Clientes') return <ClientsPage preview={preview} openImport={()=>setPage('Importar Dados')}/>
-    if (page === 'Importar Dados') return <ImportPage onPreview={setPreview}/>
+    if (page === 'Clientes') return <ClientsPage/>
+    if (page === 'Vendas') return <SalesPage/>
+    if (page === 'Importar Dados') return <ImportPage/>
     if (page === 'RUAH Intelligence') return <Intelligence/>
     if (page === 'Insights') return <Insights/>
     return <GenericPage page={page}/>
-  }, [page,preview])
+  }, [page])
   return <div className="app-shell"><Sidebar page={page} setPage={setPage} open={menuOpen} close={()=>setMenuOpen(false)}/><main><Header page={page} menu={()=>setMenuOpen(true)}/>{content}</main></div>
 }

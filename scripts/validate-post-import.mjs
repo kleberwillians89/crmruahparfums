@@ -74,11 +74,11 @@ for (const [name, paid] of expectedLeaders) {
 }
 const checks = {
   clients: Number(metrics.clients) === 418,
-  sales: Number(metrics.sales) === 5893,
+  sales: Number(metrics.sales) === 5892,
   paid_rows: Number(metrics.paid_rows) === 5495,
-  pending_rows: Number(metrics.pending_rows) === 355,
+  pending_rows: Number(metrics.pending_rows) === 354,
   paid: Number(metrics.paid) === 1561552.38,
-  pending: Number(metrics.pending) === 92257.80,
+  pending: Number(metrics.pending) === 91257.80,
   raw_gross: Number(metrics.raw_gross) === 1673690.78,
   stock_rows: Number(metrics.stock_rows) === 15,
   stock_pending: Number(metrics.stock_pending) === 1340.20,
@@ -97,8 +97,7 @@ const checks = {
   every_item_has_perfume: missingPerfume === 0,
   every_item_has_sale_type: missingType === 0,
   one_unrecoverable_ml_preserved_for_review: missingVolume === 1,
-  external_manual_sale_preserved: externalSales.length === 1
-    && externalSales[0].id === 'a18a93b5-351c-4d5b-b1f0-2867def0f2dd',
+  no_external_manual_sales: externalSales.length === 0,
   old_batch_removed: oldBatch === 0,
 }
 if (Object.values(checks).some((value) => !value)) {

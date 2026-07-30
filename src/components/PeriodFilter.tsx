@@ -1,0 +1,40 @@
+import { useRef, useState } from 'react'
+import { CalendarDays, Check, ChevronDown, X } from 'lucide-react'
+import { DayPicker, DateRange } from 'react-day-picker'
+import { format, parse } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
+import { brazilianToIso, isoToBrazilian } from '../lib/date'
+import { PeriodPreset as Preset, PeriodValue, presetPeriod } from '../lib/period'
+
+const localIso = (date:Date) => format(date,'yyyy-MM-dd')
+
+export function PeriodFilter({value,onApply}:{value:PeriodValue;onApply:(period:PeriodValue)=>void}) {
+  const [open,setOpen]=useState(false)
+  const [draft,setDraft]=useState(value)
+  const [startText,setStartText]=useState(isoToBrazilian(value.start))
+  const [endText,setEndText]=useState(isoToBrazilian(value.end))
+  const [error,setError]=useState('')
+  const root=useRef<HTMLDivElement>(null)
+  const selectPreset=(preset:Preset)=>{const next=presetPeriod(preset);setDraft(next);setStartText(isoToBrazilian(next.start));setEndText(isoToBrazilian(next.end));setError('')}
+  const commitText=()=>{const start=brazilianToIso(startText),end=brazilianToIso(endText);if(!start||!end)return setError('Informe as duas datas no formato DD/MM/AAAA.');if(end<start)return setError('A data final não pode ser anterior à inicial.');setDraft({start,end,label:'Período personalizado'});setError('')}
+  const selected:DateRange={from:parse(draft.start,'yyyy-MM-dd',new Date()),to:parse(draft.end,'yyyy-MM-dd',new Date())}
+  const apply=()=>{commitText();const start=brazilianToIso(startText),end=brazilianToIso(endText);if(!start||!end||end<start)return;onApply({...draft,start,end,label:draft.label==='Todo o período'?'Todo o período':`${isoToBrazilian(start)} a ${isoToBrazilian(end)}`});setOpen(false)}
+  return <div className="period-filter" ref={root}>
+    <button className="date-filter" onClick={()=>{if(!open){setDraft(value);setStartText(isoToBrazilian(value.start));setEndText(isoToBrazilian(value.end))}setOpen(!open)}}><CalendarDays size={17}/><span>{value.label}</span><ChevronDown size={16}/></button>
+    {open&&<div className="period-popover">
+      <div className="period-presets">{([
+        ['today','Hoje'],['yesterday','Ontem'],['7d','Últimos 7 dias'],['30d','Últimos 30 dias'],
+        ['month','Este mês'],['previous_month','Mês anterior'],['quarter','Este trimestre'],
+        ['year','Este ano'],['all','Todo o período'],['custom','Período personalizado'],
+      ] as [Preset,string][]).map(([key,label])=><button key={key} onClick={()=>selectPreset(key)}>{label}</button>)}</div>
+      <div className="period-calendar">
+        <div className="period-inputs"><label>Data inicial<input value={startText} inputMode="numeric" onChange={(event)=>setStartText(event.target.value.replace(/[^\d/]/g,'').slice(0,10))} onBlur={commitText}/></label><span>até</span><label>Data final<input value={endText} inputMode="numeric" onChange={(event)=>setEndText(event.target.value.replace(/[^\d/]/g,'').slice(0,10))} onBlur={commitText}/></label></div>
+        <DayPicker mode="range" locale={ptBR} selected={selected} numberOfMonths={2}
+          captionLayout="dropdown" startMonth={new Date(2020,0)} endMonth={new Date(2035,11)}
+          onSelect={(range)=>{if(!range?.from)return;const start=localIso(range.from),end=localIso(range.to??range.from);setDraft({start,end,label:'Período personalizado'});setStartText(isoToBrazilian(start));setEndText(isoToBrazilian(end));setError('')}}/>
+        {error&&<div className="field-error">{error}</div>}
+        <div className="period-actions"><button onClick={()=>{const empty=presetPeriod('all');setDraft(empty);setStartText(isoToBrazilian(empty.start));setEndText(isoToBrazilian(empty.end));setError('')}}><X/> Limpar</button><button className="primary" onClick={apply}><Check/> Aplicar</button></div>
+      </div>
+    </div>}
+  </div>
+}

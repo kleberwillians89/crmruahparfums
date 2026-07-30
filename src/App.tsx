@@ -1,29 +1,34 @@
 import { ChangeEvent, ReactNode, useEffect, useMemo, useState } from 'react'
 import {
   Bell, Bot, CalendarDays, ChartNoAxesCombined, Check, ChevronDown, CircleHelp,
-  Clock3, FileSpreadsheet, Home, Import, Lightbulb, Menu,
+  Clock3, Download, FileSpreadsheet, FileText, Home, Import, Lightbulb, Menu,
   MoreHorizontal, Plus, Search, Settings, ShoppingBag, Sparkles, TrendingUp,
-  UploadCloud, UserRound, UsersRound, X, AlertTriangle, ArrowUpRight,
+  Truck, UploadCloud, UserRound, UsersRound, X, AlertTriangle, ArrowUpRight,
 } from 'lucide-react'
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { brl, integer, monthLabel, shortDate } from './lib/format'
+import { format, parseISO, subDays } from 'date-fns'
+import { brl, integer, shortDate } from './lib/format'
+import { brazilianToIso } from './lib/date'
 import { ImportPreview, ParsedSale, readWorkbook } from './lib/importer'
-import report from './data/validation-report.json'
 import { ClientModal, SaleModal } from './components/RecordModals'
+import { PeriodFilter } from './components/PeriodFilter'
+import { defaultPeriod, PeriodValue } from './lib/period'
 import {
-  ClientCommercialSummary, CommercialSale, DashboardMetrics,
-  PerfumeCommercialSummary, fetchClientSummaries, fetchDashboardMetrics,
-  fetchPerfumeSummaries, fetchSalesPage,
+  CommercialSale, PeriodSummary, SaleFilters,
+  askIntelligence, fetchClientPeriodSummaries, fetchDeliveryRows,
+  fetchPeriodSummary, fetchSalesPage, updateShipment,
 } from './lib/records'
 
-type Page = 'Visão Geral' | 'Clientes' | 'Vendas' | 'Perfumes' | 'Importar Dados' | 'RUAH Intelligence' | 'Insights' | 'Configurações'
+type Page = 'Visão Geral'|'Clientes'|'Vendas'|'Entregas'|'Relatórios'|'Importação'|'IA'|'Insights'|'Configurações'
 const navigation: { label: Page; icon: typeof Home }[] = [
   { label: 'Visão Geral', icon: Home }, { label: 'Clientes', icon: UsersRound },
-  { label: 'Vendas', icon: ShoppingBag }, { label: 'Perfumes', icon: Sparkles },
-  { label: 'Importar Dados', icon: Import },
-  { label: 'RUAH Intelligence', icon: Sparkles }, { label: 'Insights', icon: Lightbulb },
+  { label: 'Vendas', icon: ShoppingBag }, { label: 'Entregas', icon: Truck },
+  { label: 'Relatórios', icon: FileText }, { label: 'Importação', icon: Import },
+  { label: 'IA', icon: Sparkles }, { label: 'Insights', icon: Lightbulb },
   { label: 'Configurações', icon: Settings },
 ]
+const routes:Record<Page,string>={'Visão Geral':'/','Clientes':'/clientes','Vendas':'/vendas','Entregas':'/entregas','Relatórios':'/relatorios','Importação':'/importacao','IA':'/ia','Insights':'/insights','Configurações':'/configuracoes'}
+const pageFromPath=()=>Object.entries(routes).find(([,path])=>path===location.pathname)?.[0] as Page||'Visão Geral'
 
 const statusLabel: Record<string, string> = { paid: 'Pago', pending: 'Aguardando', cancelled: 'Cancelado', unknown: 'Desconhecido' }
 
@@ -34,7 +39,7 @@ function Sidebar({ page, setPage, open, close }: { page: Page; setPage: (p: Page
       <div className="brand"><img src="/ruah-logo.jpg" alt="RUAH Parfums" /><div><strong>RUAH</strong><span>INTELLIGENCE</span></div></div>
       <nav>{navigation.map(({ label, icon: Icon }) =>
         <button key={label} className={page === label ? 'active' : ''} onClick={() => { setPage(label); close() }}>
-          <Icon size={19} /><span>{label}</span>{label === 'RUAH Intelligence' && <i>IA</i>}
+          <Icon size={19} /><span>{label}</span>{label === 'IA' && <i>IA</i>}
         </button>)}
       </nav>
       <div className="sidebar-foot">
@@ -73,46 +78,46 @@ function Metric({ label, value, detail, icon: Icon, tone = 'gold' }: { label: st
   </article>
 }
 
-function Dashboard() {
-  const [live,setLive]=useState<DashboardMetrics|null>(null)
+function Dashboard({period,setPeriod}:{period:PeriodValue;setPeriod:(value:PeriodValue)=>void}) {
+  const [live,setLive]=useState<PeriodSummary|null>(null)
   const [loadError,setLoadError]=useState('')
-  useEffect(()=>{fetchDashboardMetrics().then(setLive).catch(()=>setLoadError('Não foi possível consultar o Supabase.'))},[])
+  useEffect(()=>{fetchPeriodSummary(period).then(setLive).catch(()=>setLoadError('Não foi possível consultar o Supabase.'))},[period])
   const hasData = Boolean(live?.sales)
   const paid = Number(live?.paid ?? 0)
   const pending = Number(live?.pending ?? 0)
   const cancelled = Number(live?.cancelled ?? 0)
   const total = paid + pending + cancelled
-  const paymentData = report.paymentMethods.map((x: { name: string; value: number }) => x)
+  const paymentData = live?.payment_methods??[]
   const colors = ['#bf9636', '#332f29', '#817768', '#ded6c8', '#9f7c2b']
   return <div className="page">
     <div className="page-lead">
       <div><h2>O pulso comercial da RUAH</h2><p>Indicadores consolidados para decisões mais precisas.</p></div>
-      <button className="date-filter"><CalendarDays size={17} /> Todo o período <ChevronDown size={16} /></button>
+      <PeriodFilter value={period} onApply={setPeriod}/>
     </div>
     {loadError && <div className="notice"><AlertTriangle size={18} /><span>{loadError}</span></div>}
     <section className="metrics">
-      <Metric label="Volume bruto da base" value={hasData ? brl(Number(live!.raw_gross)) : '—'} detail={hasData ? `${integer(Number(live!.batch_rows))} linhas preservadas` : 'Sem dados sincronizados'} icon={ChartNoAxesCombined} />
-      <Metric label="Faturamento contabilizado" value={hasData ? brl(paid+pending) : '—'} detail={hasData ? 'Pagos + aguardando' : 'Sem dados sincronizados'} icon={TrendingUp} />
-      <Metric label="Valor pago" value={hasData ? brl(paid) : '—'} detail={hasData ? `${integer(Number(live!.paid_rows))} vendas` : 'Aguardando importação'} icon={Check} tone="dark" />
-      <Metric label="Aguardando pagamento" value={hasData ? brl(pending) : '—'} detail={hasData ? `${integer(Number(live!.pending_rows))} vendas` : 'Aguardando importação'} icon={Clock3} tone="sand" />
+      <Metric label="Vendas realizadas" value={hasData ? integer(Number(live!.sales)) : '—'} detail={period.label} icon={ShoppingBag} />
+      <Metric label="Valor total" value={hasData ? brl(Number(live!.total)) : '—'} detail={hasData ? 'Todos os status' : 'Sem dados sincronizados'} icon={TrendingUp} />
+      <Metric label="Valor pago" value={hasData ? brl(paid) : '—'} detail={hasData ? `${integer(Number(live!.paid_count))} pagamentos` : 'Aguardando importação'} icon={Check} tone="dark" />
+      <Metric label="Aguardando pagamento" value={hasData ? brl(pending) : '—'} detail={hasData ? `${integer(Number(live!.pending_count))} vendas` : 'Aguardando importação'} icon={Clock3} tone="sand" />
       <Metric label="Cancelado" value={hasData ? brl(cancelled) : '—'} detail={hasData ? 'Fora do faturamento' : 'Aguardando importação'} icon={X} tone="cream" />
-      <Metric label="Status em revisão" value={hasData ? brl(Number(live!.review)) : '—'} detail={hasData ? `${integer(Number(live!.review_rows))} registros` : 'Aguardando importação'} icon={AlertTriangle} tone="cream" />
+      <Metric label="Status em revisão" value={hasData ? brl(Number(live!.review)) : '—'} detail={hasData ? `${integer(Number(live!.review_count))} registros` : 'Aguardando importação'} icon={AlertTriangle} tone="cream" />
     </section>
     {hasData && <section className="coverage card">
-      <div><span>Cobertura financeira</span><strong>{(((Number(live!.paid_rows)+Number(live!.pending_rows))/Number(live!.sales))*100).toFixed(1).replace('.',',')}%</strong></div>
-      <div><span>Total de registros</span><strong>{integer(Number(live!.batch_rows))}</strong></div>
-      <div><span>Vendas</span><strong>{integer(Number(live!.sales))}</strong></div>
-      <div><span>Estoque</span><strong>{integer(Number(live!.stock_rows))}</strong></div>
-      <div><span>Possíveis duplicidades</span><strong>{integer(Number(live!.possible_duplicates))}</strong></div>
-      <div><span>Última venda</span><strong>{live!.last_sale?shortDate(`${live!.last_sale}T12:00:00`):'—'}</strong></div>
+      <div><span>Ticket médio</span><strong>{brl(Number(live!.average_ticket))}</strong></div>
+      <div><span>Clientes compradores</span><strong>{integer(Number(live!.buying_clients))}</strong></div>
+      <div><span>Novos clientes</span><strong>{integer(Number(live!.new_clients))}</strong></div>
+      <div><span>Clientes recorrentes</span><strong>{integer(Number(live!.recurring_clients))}</strong></div>
+      <div><span>Entregas pendentes</span><strong>{integer(Number(live!.deliveries_pending))}</strong></div>
+      <div><span>Entregas atrasadas</span><strong>{integer(Number(live!.deliveries_overdue))}</strong></div>
     </section>}
     <section className="dashboard-grid">
       <div className="card chart-card">
         <div className="card-title"><div><h3>Evolução de faturamento</h3><p>Receita mensal da base validada</p></div><span className="live-dot">DADOS REAIS</span></div>
-        {hasData ? <ResponsiveContainer width="100%" height={260}><AreaChart data={report.monthly}>
+        {hasData ? <ResponsiveContainer width="100%" height={260}><AreaChart data={live!.daily}>
           <defs><linearGradient id="goldFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#bf9636" stopOpacity={0.28}/><stop offset="100%" stopColor="#bf9636" stopOpacity={0}/></linearGradient></defs>
-          <CartesianGrid stroke="#eee9e1" vertical={false}/><XAxis dataKey="month" tickFormatter={monthLabel} axisLine={false} tickLine={false}/><YAxis tickFormatter={(v) => `${Math.round(v/1000)}k`} axisLine={false} tickLine={false}/>
-          <Tooltip formatter={(v) => brl(Number(v))} labelFormatter={monthLabel}/><Area type="monotone" dataKey="revenue" stroke="#b68a25" strokeWidth={2.5} fill="url(#goldFill)"/>
+          <CartesianGrid stroke="#eee9e1" vertical={false}/><XAxis dataKey="period_date" tickFormatter={(value)=>shortDate(value)} axisLine={false} tickLine={false}/><YAxis tickFormatter={(v) => `${Math.round(v/1000)}k`} axisLine={false} tickLine={false}/>
+          <Tooltip formatter={(v) => brl(Number(v))} labelFormatter={(value)=>shortDate(String(value))}/><Area type="monotone" dataKey="paid" stroke="#b68a25" strokeWidth={2.5} fill="url(#goldFill)"/>
         </AreaChart></ResponsiveContainer> : <ChartPlaceholder />}
       </div>
       <div className="card chart-card">
@@ -132,7 +137,7 @@ function Dashboard() {
       <div className="card intelligence-card">
         <div className="ai-orb"><Sparkles size={22}/></div><span>RUAH INTELLIGENCE</span>
         <h3>Uma leitura inteligente da sua operação.</h3>
-        <p>{hasData ? `A base possui ${integer(report.valid)} vendas válidas. Gere análises após confirmar a importação no Supabase.` : 'Quando os dados estiverem conectados, a IA encontrará tendências, riscos e oportunidades sem expor informações desnecessárias.'}</p>
+        <p>{hasData ? `O período possui ${integer(Number(live!.sales))} vendas reais. A IA recebe apenas agregados autorizados.` : 'Quando houver dados no período, a IA encontrará tendências, riscos e oportunidades.'}</p>
         <button>Conversar com a inteligência <ArrowUpRight size={16}/></button>
       </div>
     </section>
@@ -201,25 +206,35 @@ function PreviewRow({ row }: { row: ParsedSale }) {
   return <tr><td>{row.row}</td><td><strong>{row.client || '—'}</strong></td><td>{row.date || '—'}</td><td>{row.amount === null ? '—' : brl(row.amount)}</td><td><span className={`badge ${row.paymentStatus}`}>{statusLabel[row.paymentStatus]}</span></td><td>{row.paymentMethod || '—'}</td><td>{issues.length ? <span className="row-error"><AlertTriangle/> {issues.join(', ')}</span> : <span className="row-ok"><Check/> Contabilizável</span>}</td></tr>
 }
 
-function Intelligence() {
+function Intelligence({period,setPeriod}:{period:PeriodValue;setPeriod:(value:PeriodValue)=>void}) {
   const suggestions = ['Quanto faturamos neste mês?', 'Quais oportunidades comerciais existem?', 'Como está a qualidade dos dados?', 'Que ação devemos priorizar agora?']
-  return <div className="page intelligence-page">
+  const [question,setQuestion]=useState(''),[answer,setAnswer]=useState<Record<string,unknown>|null>(null),[loading,setLoading]=useState(false),[error,setError]=useState('')
+  const submit=async(text=question)=>{if(!text.trim()||loading)return;setLoading(true);setError('');try{setAnswer(await askIntelligence(text,period));setQuestion(text)}catch(err){setError(err instanceof Error?err.message:'A inteligência está indisponível.')}finally{setLoading(false)}}
+  return <div className="page intelligence-page"><div className="page-lead"><div><h2>RUAH Intelligence</h2><p>Análise consultiva baseada apenas em agregados reais.</p></div><PeriodFilter value={period} onApply={setPeriod}/></div>
     <div className="intelligence-hero"><div className="hero-spark"><Sparkles/></div><span>RUAH INTELLIGENCE</span><h2>Decisões mais claras começam<br/>com as perguntas certas.</h2><p>Respostas baseadas exclusivamente nos dados autorizados da sua operação.</p></div>
     <div className="chat-box card">
-      <div className="chat-empty"><Bot/><h3>Como posso ajudar hoje?</h3><p>Escolha uma sugestão ou escreva uma pergunta sobre os dados da RUAH.</p></div>
-      <div className="suggestions">{suggestions.map(x=><button key={x}>{x}<ArrowUpRight size={14}/></button>)}</div>
-      <div className="chat-input"><input placeholder="Pergunte sobre faturamento, clientes, pagamentos…"/><button><ArrowUpRight/></button></div>
+      {!answer?<div className="chat-empty"><Bot/><h3>Como posso ajudar hoje?</h3><p>Escolha uma sugestão ou escreva uma pergunta sobre os dados da RUAH.</p></div>:<div className="ai-answer"><span>Período: {String(answer.periodo_analisado??period.label)}</span><h3>{String(answer.resumo??'Análise concluída')}</h3><p>{String(answer.evidencias??'')}</p><p><strong>Insights:</strong> {String(answer.insights??'')}</p><p><strong>Recomendações:</strong> {String(answer.recomendacoes??'')}</p><p><strong>Próximas ações:</strong> {String(answer.proximas_acoes??'')}</p></div>}
+      <div className="suggestions">{suggestions.map(x=><button key={x} onClick={()=>submit(x)}>{x}<ArrowUpRight size={14}/></button>)}</div>
+      <div className="chat-input"><input value={question} onChange={(event)=>setQuestion(event.target.value)} maxLength={1000} placeholder="Pergunte sobre faturamento, clientes, pagamentos…"/><button disabled={loading} onClick={()=>submit()}>{loading?<Clock3/>:<ArrowUpRight/>}</button></div>
+      {error&&<div className="form-error">{error}</div>}
       <small><span className="dot"/> A IA só acessa métricas agregadas e autorizadas</small>
     </div>
   </div>
 }
 
-function Insights() {
+function Insights({period}:{period:PeriodValue}) {
+  const [summary,setSummary]=useState<PeriodSummary|null>(null)
+  useEffect(()=>{fetchPeriodSummary(period).then(setSummary).catch(()=>setSummary(null))},[period])
+  const blocks=summary?[
+    ['Pagamentos aguardando',`${integer(summary.pending_count)} vendas · ${brl(Number(summary.pending))}`],
+    ['Entregas atrasadas',`${integer(summary.deliveries_overdue)} itens exigem atenção`],
+    ['Clientes recorrentes',`${integer(summary.recurring_clients)} clientes no período`],
+  ]:[]
   return <div className="page"><div className="page-lead"><div><h2>Insights comerciais</h2><p>Recomendações práticas geradas a partir de métricas oficiais.</p></div><button className="primary"><Sparkles size={17}/> Gerar novos insights</button></div>
     <div className="insight-grid">
-      {['Receita','Recorrência','Oportunidade'].map((x,i)=><article className="card insight-skeleton" key={x}><div><span>{x}</span><i>{i===0?'ALTO':i===1?'MÉDIO':'NOVO'}</i></div><h3>{report.valid ? 'Pronto para interpretar a base validada' : 'Aguardando dados para uma análise confiável'}</h3><p>A inteligência não inventará números. Conecte o Supabase e gere a análise quando houver métricas autorizadas.</p><footer><Clock3 size={14}/> Ainda não gerado</footer></article>)}
+      {blocks.map(([title,text],i)=><article className="card insight-skeleton" key={title}><div><span>{title}</span><i>{i===1?'ALTO':'REAL'}</i></div><h3>{text}</h3><p>Calculado diretamente no Supabase para {period.label.toLowerCase()}.</p><footer><Clock3 size={14}/> Atualizado agora</footer></article>)}
     </div>
-    {!report.valid && <EmptyConnect title="Seus insights aparecerão aqui" text="Após a primeira importação, a RUAH Intelligence poderá identificar tendências e oportunidades."/>}
+    {!summary&&<EmptyConnect title="Insights indisponíveis" text="Não foi possível consultar os agregados reais."/>}
   </div>
 }
 
@@ -239,69 +254,116 @@ function GenericPage({ page }: { page: Page }) {
   </div>
 }
 
-function ClientsPage() {
+function ClientsPage({period,setPeriod}:{period:PeriodValue;setPeriod:(value:PeriodValue)=>void}) {
   const [modal,setModal]=useState(false)
-  const [clients,setClients]=useState<ClientCommercialSummary[]>([])
+  const [clients,setClients]=useState<Record<string,unknown>[]>([])
+  const [search,setSearch]=useState(''),[status,setStatus]=useState(''),[order,setOrder]=useState('paid')
   const [loading,setLoading]=useState(true)
   const [error,setError]=useState('')
-  useEffect(()=>{fetchClientSummaries().then(setClients).catch(()=>setError('Não foi possível consultar os clientes.')).finally(()=>setLoading(false))},[])
+  useEffect(()=>{fetchClientPeriodSummaries(period).then(setClients).catch(()=>setError('Não foi possível consultar os clientes.')).finally(()=>setLoading(false))},[period])
+  const visible=clients.filter((client)=>String(client.client).toLowerCase().includes(search.toLowerCase())&&(!status||client.relationship_status===status))
+    .sort((a,b)=>order==='name'?String(a.client).localeCompare(String(b.client),'pt-BR'):Number(b[order])-Number(a[order]))
   return <div className="page">{modal&&<ClientModal close={()=>setModal(false)}/>}
-    <div className="page-lead"><div><h2>Clientes</h2><p>Relacionamento, recorrência e histórico em um só lugar.</p></div><button className="primary" onClick={()=>setModal(true)}><Plus size={17}/> Adicionar cliente</button></div>
+    <div className="page-lead"><div><h2>Clientes</h2><p>Relacionamento, recorrência e histórico no período.</p></div><div className="page-actions"><PeriodFilter value={period} onApply={setPeriod}/><button className="primary" onClick={()=>setModal(true)}><Plus size={17}/> Adicionar cliente</button></div></div>
+    <div className="toolbar card"><div className="search"><Search size={18}/><input value={search} onChange={(event)=>setSearch(event.target.value)} placeholder="Buscar cliente…"/></div>
+      <select value={status} onChange={(event)=>setStatus(event.target.value)}><option value="">Todos os status</option><option value="new">Novo</option><option value="recurring">Recorrente</option><option value="active">Ativo</option><option value="inactive">Inativo</option></select>
+      <select value={order} onChange={(event)=>setOrder(event.target.value)}><option value="paid">Maior valor pago</option><option value="total_purchased">Maior valor total</option><option value="item_count">Mais compras</option><option value="average_ticket">Maior ticket</option><option value="name">Nome</option></select></div>
     {loading?<div className="empty card"><h3>Carregando clientes do Supabase…</h3></div>:error?<div className="notice"><AlertTriangle size={18}/><span>{error}</span></div>:
-    <div className="card clients-table"><div className="clients-caption"><div><strong>{integer(clients.length)} clientes</strong><span>Ordenados por valor pago, do maior para o menor</span></div><span className="live-dot">SUPABASE</span></div>
-      <div className="table-wrap"><table><thead><tr><th>Cliente</th><th>Total comprado</th><th>Pago</th><th>Aguardando</th><th>Itens</th><th>ML</th><th>Perfumes</th><th>Tipos</th><th>Ticket médio</th><th>Primeira compra</th><th>Última compra</th></tr></thead>
-      <tbody>{clients.map((c)=><tr key={c.client_id}><td><strong>{c.client}</strong></td><td>{brl(Number(c.total_purchased))}</td><td>{brl(Number(c.paid))}</td><td>{brl(Number(c.pending))}</td><td>{integer(Number(c.item_count))}</td><td>{Number(c.total_ml).toLocaleString('pt-BR')} ml</td><td title={(c.perfumes??[]).join(', ')}>{(c.perfumes??[]).slice(0,2).join(', ')||'—'}</td><td>{(c.sale_types??[]).join(' / ')||'—'}</td><td>{brl(Number(c.average_ticket))}</td><td>{c.first_purchase?shortDate(`${c.first_purchase}T12:00:00`):'—'}</td><td>{c.last_purchase?shortDate(`${c.last_purchase}T12:00:00`):'—'}</td></tr>)}</tbody></table></div>
+    <div className="card clients-table"><div className="clients-caption"><div><strong>{integer(visible.length)} clientes</strong><span>Dados reais no período selecionado</span></div><span className="live-dot">SUPABASE</span></div>
+      <div className="table-wrap"><table><thead><tr><th>Cliente</th><th>Total</th><th>Pago</th><th>Aguardando</th><th>Compras</th><th>Ticket médio</th><th>Perfume mais comprado</th><th>ML total</th><th>Entregas pendentes</th><th>Status</th><th>Primeira</th><th>Última</th></tr></thead>
+      <tbody>{visible.map((c)=><tr key={String(c.client_id)}><td><strong>{String(c.client)}</strong></td><td>{brl(Number(c.total_purchased))}</td><td>{brl(Number(c.paid))}</td><td>{brl(Number(c.pending))}</td><td>{integer(Number(c.item_count))}</td><td>{brl(Number(c.average_ticket))}</td><td>{String(c.top_perfume??'—')}</td><td>{Number(c.total_ml).toLocaleString('pt-BR')} ml</td><td>{integer(Number(c.pending_deliveries))}</td><td><span className="badge pending">{String(c.relationship_status)}</span></td><td>{c.first_purchase?shortDate(String(c.first_purchase)):'—'}</td><td>{c.last_purchase?shortDate(String(c.last_purchase)):'—'}</td></tr>)}</tbody></table></div>
     </div>}
   </div>
 }
 
-function SalesPage() {
+const exportCsv=(name:string,rows:Record<string,unknown>[])=>{const keys=Object.keys(rows[0]??{});const escape=(value:unknown)=>`"${String(value??'').replaceAll('"','""')}"`;const csv=[keys.map(escape).join(';'),...rows.map((row)=>keys.map((key)=>escape(row[key])).join(';'))].join('\n');const url=URL.createObjectURL(new Blob([`\uFEFF${csv}`],{type:'text/csv;charset=utf-8'}));const link=document.createElement('a');link.href=url;link.download=name;link.click();URL.revokeObjectURL(url)}
+
+function SalesPage({period,setPeriod}:{period:PeriodValue;setPeriod:(value:PeriodValue)=>void}) {
   const [modal,setModal]=useState(false)
   const [sales,setSales]=useState<CommercialSale[]>([])
   const [count,setCount]=useState(0)
-  const [error,setError]=useState('')
-  useEffect(()=>{fetchSalesPage().then((result)=>{setSales(result.rows);setCount(result.count)}).catch(()=>setError('Não foi possível consultar as vendas.'))},[])
+  const [page,setPage]=useState(0),[loading,setLoading]=useState(true),[error,setError]=useState('')
+  const [filters,setFilters]=useState<SaleFilters>({period,sort:'sale_date_desc'})
+  const setFilter=(key:keyof SaleFilters,value:string)=>{setPage(0);setFilters((current)=>({...current,[key]:value||undefined}))}
+  useEffect(()=>{fetchSalesPage({...filters,period},page,50).then((result)=>{setSales(result.rows);setCount(result.count)}).catch(()=>setError('Não foi possível consultar as vendas.')).finally(()=>setLoading(false))},[filters,page,period])
+  const total=sales.reduce((sum,sale)=>sum+Number(sale.amount),0)
   return <div className="page">{modal&&<SaleModal close={()=>setModal(false)}/>}
-    <div className="page-lead"><div><h2>Vendas</h2><p>Dados consultados diretamente no Supabase.</p></div><button className="primary" onClick={()=>setModal(true)}><Plus size={17}/> Adicionar venda</button></div>
-    {error?<div className="notice"><AlertTriangle size={18}/><span>{error}</span></div>:
-    <div className="card clients-table"><div className="clients-caption"><div><strong>{integer(count)} vendas</strong><span>Exibindo as 200 mais recentes</span></div><span className="live-dot">SUPABASE</span></div>
-      <div className="table-wrap"><table><thead><tr><th>Cliente</th><th>Data</th><th>Perfume</th><th>Frasco</th><th>Tipo</th><th>ML</th><th>Valor</th><th>Pagamento</th><th>Forma</th><th>Data pagmt.</th><th>Prazo/status envio</th><th>Enviado em</th><th>Observação</th></tr></thead>
-      <tbody>{sales.map((sale)=><tr key={sale.id}><td><strong>{sale.clients?.name??sale.original_client??'—'}</strong></td><td>{sale.sale_date?shortDate(`${sale.sale_date}T12:00:00`):'—'}</td><td>{sale.perfume_name_raw??'—'}</td><td>{sale.bottle_identifier??'—'}</td><td>{sale.sale_type??'—'}</td><td>{sale.volume_ml===null?'Revisar':`${Number(sale.volume_ml).toLocaleString('pt-BR')} ml`}</td><td>{brl(Number(sale.amount))}</td><td><span className={`badge ${sale.payment_status}`}>{statusLabel[sale.payment_status]}</span></td><td>{sale.payment_method??'—'}</td><td>{sale.paid_at?shortDate(`${sale.paid_at}T12:00:00`):'—'}</td><td>{sale.shipping_deadline_raw||sale.shipping_operational_status||'—'}</td><td>{sale.shipped_at?shortDate(`${sale.shipped_at}T12:00:00`):'—'}</td><td>{sale.notes??'—'}</td></tr>)}</tbody></table></div>
+    <div className="page-lead"><div><h2>Vendas</h2><p>Consulta, edição e exportação dos registros reais.</p></div><div className="page-actions"><PeriodFilter value={period} onApply={setPeriod}/><button onClick={()=>exportCsv('vendas-ruah.csv',sales as unknown as Record<string,unknown>[])}><Download size={17}/> Exportar CSV</button><button className="primary" onClick={()=>setModal(true)}><Plus size={17}/> Nova venda</button></div></div>
+    <div className="toolbar card sales-filters"><div className="search"><Search size={18}/><input value={filters.search??''} onChange={(event)=>setFilter('search',event.target.value)} placeholder="Cliente, perfume ou observação…"/></div>
+      <input value={filters.client??''} onChange={(event)=>setFilter('client',event.target.value)} placeholder="Cliente"/>
+      <input value={filters.perfume??''} onChange={(event)=>setFilter('perfume',event.target.value)} placeholder="Perfume"/>
+      <select value={filters.type??''} onChange={(event)=>setFilter('type',event.target.value)}><option value="">APC e SPLIT</option><option>APC</option><option>SPLIT</option></select>
+      <input inputMode="decimal" value={filters.volumeMl??''} onChange={(event)=>setFilters((current)=>({...current,volumeMl:event.target.value?Number(event.target.value):undefined}))} placeholder="ML"/>
+      <select value={filters.status??''} onChange={(event)=>setFilter('status',event.target.value)}><option value="">Todos os pagamentos</option><option value="paid">Pago</option><option value="pending">Aguardando</option><option value="cancelled">Cancelado</option><option value="unknown">Revisão</option></select>
+      <select value={filters.method??''} onChange={(event)=>setFilter('method',event.target.value)}><option value="">Todas as formas</option><option>PIX</option><option>CARTÃO</option><option>DEPÓSITO</option></select>
+      <select value={filters.origin??''} onChange={(event)=>setFilter('origin',event.target.value)}><option value="">Todas as origens</option><option value="spreadsheet">Importação</option><option value="manual">Manual</option></select>
+      <input inputMode="decimal" value={filters.minValue??''} onChange={(event)=>setFilters((current)=>({...current,minValue:event.target.value?Number(event.target.value):undefined}))} placeholder="Valor mínimo"/>
+      <input inputMode="decimal" value={filters.maxValue??''} onChange={(event)=>setFilters((current)=>({...current,maxValue:event.target.value?Number(event.target.value):undefined}))} placeholder="Valor máximo"/>
+      <select value={filters.sort??''} onChange={(event)=>setFilter('sort',event.target.value)}><option value="sale_date_desc">Data mais recente</option><option value="sale_date_asc">Data mais antiga</option><option value="amount_desc">Maior valor</option><option value="client_name_raw_asc">Cliente</option><option value="perfume_name_raw_asc">Perfume</option></select></div>
+    {loading?<div className="empty card"><h3>Carregando vendas…</h3></div>:error?<div className="notice"><AlertTriangle size={18}/><span>{error}</span></div>:
+    <div className="card clients-table"><div className="clients-caption"><div><strong>{integer(count)} vendas filtradas</strong><span>{brl(total)} nesta página</span></div><span className="live-dot">SUPABASE</span></div>
+      <div className="table-wrap"><table><thead><tr><th>Data</th><th>Cliente</th><th>Perfume</th><th>Tipo</th><th>ML</th><th>Valor</th><th>Pagamento</th><th>Forma</th><th>Data pagmt.</th><th>Prazo</th><th>Data envio</th><th>Entrega</th><th>Origem</th><th>Ações</th></tr></thead>
+      <tbody>{sales.map((sale)=><tr key={sale.id}><td>{sale.sale_date?shortDate(sale.sale_date):'—'}</td><td><strong>{sale.clients?.name??sale.original_client??'—'}</strong></td><td>{sale.perfume_name_raw??'—'}</td><td>{sale.sale_type??'—'}</td><td>{sale.volume_ml===null?'Revisar':`${Number(sale.volume_ml).toLocaleString('pt-BR')} ml`}</td><td>{brl(Number(sale.amount))}</td><td><span className={`badge ${sale.payment_status}`}>{statusLabel[sale.payment_status]}</span></td><td>{sale.payment_method??'—'}</td><td>{sale.paid_at?shortDate(sale.paid_at):'—'}</td><td>{sale.shipping_deadline_raw||'—'}</td><td>{sale.shipped_at?shortDate(sale.shipped_at):'—'}</td><td>{deliveryLabel(sale)}</td><td>{sale.source==='spreadsheet'?'Importação':'Manual'}</td><td><button onClick={()=>alert(`Venda ${sale.id}\n${sale.notes??'Sem observação'}`)}>Ver detalhes</button></td></tr>)}</tbody></table></div>
+      <div className="table-foot"><button disabled={page===0} onClick={()=>setPage(page-1)}>Anterior</button><span>Página {page+1} de {Math.max(1,Math.ceil(count/50))}</span><button disabled={(page+1)*50>=count} onClick={()=>setPage(page+1)}>Próxima</button></div>
     </div>}
   </div>
 }
 
-function PerfumesPage() {
-  const [perfumes,setPerfumes]=useState<PerfumeCommercialSummary[]>([])
-  const [search,setSearch]=useState('')
-  const [type,setType]=useState('')
-  const [error,setError]=useState('')
-  useEffect(()=>{fetchPerfumeSummaries().then(setPerfumes).catch(()=>setError('Não foi possível consultar os perfumes.'))},[])
-  const visible=perfumes.filter((item)=>item.perfume_name.toLowerCase().includes(search.toLowerCase())
-    && (!type||(item.sale_types??[]).includes(type)))
-  return <div className="page"><div className="page-lead"><div><h2>Perfumes</h2><p>Itens, frascos, volumes, clientes e operação de envio.</p></div></div>
-    <div className="toolbar card"><div className="search"><Search size={18}/><input value={search} onChange={(event)=>setSearch(event.target.value)} placeholder="Filtrar por perfume ou frasco…"/></div>
-      <button className={!type?'active':''} onClick={()=>setType('')}>Todos</button><button onClick={()=>setType('APC')}>APC</button><button onClick={()=>setType('SPLIT')}>SPLIT</button></div>
-    {error?<div className="notice"><AlertTriangle size={18}/><span>{error}</span></div>:
-    <div className="card clients-table"><div className="clients-caption"><div><strong>{integer(visible.length)} referências</strong><span>Frascos diferentes permanecem separados</span></div><span className="live-dot">SUPABASE</span></div>
-      <div className="table-wrap"><table><thead><tr><th>Perfume</th><th>Frasco</th><th>Tipos</th><th>ML total</th><th>ML pago</th><th>ML aguardando</th><th>Estoque</th><th>Clientes</th><th>Itens</th><th>Valor total</th><th>Pago</th><th>Aguardando</th><th>Status de envio</th></tr></thead>
-      <tbody>{visible.map((item)=><tr key={item.perfume_id}><td><strong>{item.perfume_name}</strong></td><td>{item.bottle_identifier??'—'}</td><td>{(item.sale_types??[]).join(' / ')||'—'}</td><td>{Number(item.total_ml).toLocaleString('pt-BR')} ml</td><td>{Number(item.paid_ml).toLocaleString('pt-BR')} ml</td><td>{Number(item.pending_ml).toLocaleString('pt-BR')} ml</td><td>{Number(item.stock_ml).toLocaleString('pt-BR')} ml · {integer(Number(item.stock_items))} itens</td><td>{integer(Number(item.client_count))}</td><td>{integer(Number(item.item_count))}</td><td>{brl(Number(item.total_value))}</td><td>{brl(Number(item.paid_value))}</td><td>{brl(Number(item.pending_value))}</td><td>{(item.shipping_statuses??[]).join(', ')||'—'}</td></tr>)}</tbody></table></div>
-    </div>}
+const todayIso=()=>format(new Date(),'yyyy-MM-dd')
+function deliveryState(sale:CommercialSale) {
+  if(sale.shipped_at&&sale.shipping_deadline_date)return sale.shipped_at<=sale.shipping_deadline_date?'shipped_on_time':'shipped_late'
+  if(sale.shipped_at)return 'shipped'
+  if(sale.shipping_deadline_date)return sale.shipping_deadline_date<todayIso()?'overdue':'awaiting_shipment'
+  return 'no_deadline'
+}
+const deliveryLabels:Record<string,string>={awaiting_shipment:'Aguardando envio',overdue:'Envio atrasado',shipped_on_time:'Enviado no prazo',shipped_late:'Enviado com atraso',shipped:'Enviado',no_deadline:'Sem prazo'}
+const deliveryLabel=(sale:CommercialSale)=>deliveryLabels[deliveryState(sale)]
+
+function DeliveriesPage({period,setPeriod}:{period:PeriodValue;setPeriod:(value:PeriodValue)=>void}) {
+  const [rows,setRows]=useState<CommercialSale[]>([]),[filter,setFilter]=useState(''),[search,setSearch]=useState(''),[error,setError]=useState(''),[loading,setLoading]=useState(true)
+  const reload=()=>{fetchDeliveryRows(period).then(setRows).catch(()=>setError('Não foi possível consultar as entregas.')).finally(()=>setLoading(false))}
+  useEffect(reload,[period])
+  const counts=rows.reduce((acc,row)=>{const key=deliveryState(row);acc[key]=(acc[key]??0)+1;return acc},{} as Record<string,number>)
+  const visible=rows.filter((row)=>(!filter||deliveryState(row)===filter)&&(!search||`${row.original_client} ${row.perfume_name_raw}`.toLowerCase().includes(search.toLowerCase())))
+  const register=async(row:CommercialSale,clear=false)=>{if(clear&&!confirm('Confirma a remoção da data de envio?'))return;let value:string|null=clear?null:todayIso();if(!clear&&row.shipped_at){const typed=prompt('Informe a data de envio em DD/MM/AAAA',shortDate(row.shipped_at));if(typed===null)return;value=brazilianToIso(typed);if(!value)return alert('Data inválida.')}try{await updateShipment(row.id,value);reload()}catch(err){setError(err instanceof Error?err.message:'Falha ao atualizar envio.')}}
+  return <div className="page"><div className="page-lead"><div><h2>Entregas</h2><p>Uma única fonte de verdade: os dados de envio da própria venda.</p></div><PeriodFilter value={period} onApply={setPeriod}/></div>
+    <section className="metrics">{[['awaiting_shipment','Aguardando envio'],['overdue','Envio atrasado'],['shipped_on_time','Enviados no prazo'],['shipped_late','Enviados com atraso'],['shipped','Enviados'],['no_deadline','Sem prazo']].map(([key,label])=><Metric key={key} label={label} value={integer(counts[key]??0)} detail={period.label} icon={Truck}/>)}</section>
+    <div className="toolbar card"><div className="search"><Search size={18}/><input value={search} onChange={(event)=>setSearch(event.target.value)} placeholder="Cliente ou perfume…"/></div><select value={filter} onChange={(event)=>setFilter(event.target.value)}><option value="">Todos os status</option>{Object.entries(deliveryLabels).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></div>
+    {loading?<div className="empty card"><h3>Carregando entregas…</h3></div>:error?<div className="notice"><AlertTriangle/><span>{error}</span></div>:<div className="card clients-table"><div className="clients-caption"><strong>{integer(visible.length)} registros</strong><span className="live-dot">SUPABASE</span></div><div className="table-wrap"><table><thead><tr><th>Cliente</th><th>Perfume</th><th>Tipo</th><th>ML</th><th>Venda</th><th>Prazo</th><th>Envio</th><th>Status</th><th>Valor</th><th>Observação</th><th>Ações</th></tr></thead><tbody>{visible.slice(0,500).map((row)=><tr key={row.id}><td><strong>{row.clients?.name??row.original_client}</strong></td><td>{row.perfume_name_raw}</td><td>{row.sale_type}</td><td>{row.volume_ml??'—'}</td><td>{row.sale_date?shortDate(row.sale_date):'—'}</td><td>{row.shipping_deadline_date?shortDate(row.shipping_deadline_date):row.shipping_deadline_raw||'—'}</td><td>{row.shipped_at?shortDate(row.shipped_at):'—'}</td><td><span className={`badge ${deliveryState(row)==='overdue'?'cancelled':'pending'}`}>{deliveryLabel(row)}</span></td><td>{brl(Number(row.amount))}</td><td>{row.notes??'—'}</td><td><button onClick={()=>register(row)}>{row.shipped_at?'Editar envio':'Registrar envio'}</button>{row.shipped_at&&<button onClick={()=>register(row,true)}>Limpar</button>}</td></tr>)}</tbody></table></div></div>}
+  </div>
+}
+
+function previousPeriod(period:PeriodValue):PeriodValue {
+  const start=parseISO(period.start),end=parseISO(period.end),days=Math.max(1,Math.round((end.getTime()-start.getTime())/86400000)+1)
+  const previousEnd=subDays(start,1),previousStart=subDays(previousEnd,days-1)
+  return {start:format(previousStart,'yyyy-MM-dd'),end:format(previousEnd,'yyyy-MM-dd'),label:'Período anterior'}
+}
+function ReportsPage({period,setPeriod}:{period:PeriodValue;setPeriod:(value:PeriodValue)=>void}) {
+  const [current,setCurrent]=useState<PeriodSummary|null>(null),[previous,setPrevious]=useState<PeriodSummary|null>(null)
+  useEffect(()=>{Promise.all([fetchPeriodSummary(period),fetchPeriodSummary(previousPeriod(period))]).then(([a,b])=>{setCurrent(a);setPrevious(b)})},[period])
+  const variation=(now:number,before:number)=>before?`${(((now-before)/before)*100).toFixed(1).replace('.',',')}%`:'—'
+  const rows=current?[{indicador:'Valor pago',atual:brl(Number(current.paid)),anterior:brl(Number(previous?.paid??0)),variacao:variation(Number(current.paid),Number(previous?.paid??0))},{indicador:'Vendas',atual:integer(current.sales),anterior:integer(previous?.sales??0),variacao:variation(current.sales,previous?.sales??0)},{indicador:'Ticket médio',atual:brl(Number(current.average_ticket)),anterior:brl(Number(previous?.average_ticket??0)),variacao:variation(Number(current.average_ticket),Number(previous?.average_ticket??0))},{indicador:'Clientes',atual:integer(current.buying_clients),anterior:integer(previous?.buying_clients??0),variacao:variation(current.buying_clients,previous?.buying_clients??0)}]:[]
+  return <div className="page"><div className="page-lead"><div><h2>Relatórios</h2><p>Resumo financeiro e comparação matemática entre períodos.</p></div><div className="page-actions"><PeriodFilter value={period} onApply={setPeriod}/><button onClick={()=>exportCsv('relatorio-ruah.csv',rows)}><Download/> Exportar</button></div></div>
+    {!current?<div className="empty card"><h3>Carregando relatório…</h3></div>:<><section className="metrics"><Metric label="Pagamentos" value={integer(current.paid_count)} detail={brl(Number(current.paid))} icon={Check}/><Metric label="Aguardando" value={integer(current.pending_count)} detail={brl(Number(current.pending))} icon={Clock3}/><Metric label="Canceladas" value={integer(current.cancelled_count)} detail={brl(Number(current.cancelled))} icon={X}/><Metric label="Em revisão" value={integer(current.review_count)} detail={brl(Number(current.review))} icon={AlertTriangle}/><Metric label="Ticket médio" value={brl(Number(current.average_ticket))} detail={`${integer(current.buying_clients)} clientes`} icon={TrendingUp}/><Metric label="Entregas pendentes" value={integer(current.deliveries_pending)} detail={`${integer(current.deliveries_overdue)} atrasadas`} icon={Truck}/></section><div className="card clients-table"><div className="clients-caption"><strong>Comparação com o período anterior</strong></div><table><thead><tr><th>Indicador</th><th>Atual</th><th>Anterior</th><th>Variação</th></tr></thead><tbody>{rows.map((row)=><tr key={row.indicador}><td>{row.indicador}</td><td>{row.atual}</td><td>{row.anterior}</td><td>{row.variacao}</td></tr>)}</tbody></table></div></>}
   </div>
 }
 
 export function App() {
-  const [page, setPage] = useState<Page>('Visão Geral')
+  const [page, setPage] = useState<Page>(pageFromPath())
+  const [period,setPeriod]=useState<PeriodValue>(defaultPeriod())
   const [menuOpen, setMenuOpen] = useState(false)
+  useEffect(()=>{const change=()=>setPage(pageFromPath());addEventListener('popstate',change);return()=>removeEventListener('popstate',change)},[])
+  const navigate=(next:Page)=>{history.pushState({},'',routes[next]);setPage(next)}
   const content = useMemo<ReactNode>(() => {
-    if (page === 'Visão Geral') return <Dashboard/>
-    if (page === 'Clientes') return <ClientsPage/>
-    if (page === 'Vendas') return <SalesPage/>
-    if (page === 'Perfumes') return <PerfumesPage/>
-    if (page === 'Importar Dados') return <ImportPage/>
-    if (page === 'RUAH Intelligence') return <Intelligence/>
-    if (page === 'Insights') return <Insights/>
+    if (page === 'Visão Geral') return <Dashboard period={period} setPeriod={setPeriod}/>
+    if (page === 'Clientes') return <ClientsPage period={period} setPeriod={setPeriod}/>
+    if (page === 'Vendas') return <SalesPage period={period} setPeriod={setPeriod}/>
+    if (page === 'Entregas') return <DeliveriesPage period={period} setPeriod={setPeriod}/>
+    if (page === 'Relatórios') return <ReportsPage period={period} setPeriod={setPeriod}/>
+    if (page === 'Importação') return <ImportPage/>
+    if (page === 'IA') return <Intelligence period={period} setPeriod={setPeriod}/>
+    if (page === 'Insights') return <Insights period={period}/>
     return <GenericPage page={page}/>
-  }, [page])
-  return <div className="app-shell"><Sidebar page={page} setPage={setPage} open={menuOpen} close={()=>setMenuOpen(false)}/><main><Header page={page} menu={()=>setMenuOpen(true)}/>{content}</main></div>
+  }, [page,period])
+  return <div className="app-shell"><Sidebar page={page} setPage={navigate} open={menuOpen} close={()=>setMenuOpen(false)}/><main><Header page={page} menu={()=>setMenuOpen(true)}/>{content}</main></div>
 }

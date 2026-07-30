@@ -4,7 +4,9 @@ export const brl = (value: number) =>
 export const integer = (value: number) => new Intl.NumberFormat('pt-BR').format(value)
 
 export const shortDate = (value: string | Date) =>
-  new Intl.DateTimeFormat('pt-BR').format(new Date(value))
+  typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)
+    ? `${value.slice(8,10)}/${value.slice(5,7)}/${value.slice(0,4)}`
+    : new Intl.DateTimeFormat('pt-BR', { timeZone:'America/Sao_Paulo' }).format(new Date(value))
 
 export const monthLabel = (month: string) => {
   const [year, m] = month.split('-').map(Number)

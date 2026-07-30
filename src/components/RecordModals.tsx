@@ -35,17 +35,27 @@ export function ClientModal({ close, onSaved }: { close:()=>void; onSaved?: (cli
 export function SaleModal({ close }: { close:()=>void }) {
   const [query,setQuery]=useState(''),[clients,setClients]=useState<{id:string;name:string}[]>([]),[client,setClient]=useState<{id:string;name:string}|null>(null)
   const [date,setDate]=useState(''),[amount,setAmount]=useState(''),[status,setStatus]=useState('paid'),[method,setMethod]=useState('PIX'),[notes,setNotes]=useState('')
+  const [deadline,setDeadline]=useState(''),[shippingStatus,setShippingStatus]=useState(''),[shippedAt,setShippedAt]=useState(''),[paidAt,setPaidAt]=useState('')
+  const [saleType,setSaleType]=useState<'APC'|'SPLIT'>('SPLIT'),[ml,setMl]=useState(''),[perfume,setPerfume]=useState(''),[credit,setCredit]=useState('')
   const [saving,setSaving]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState(''),[newClient,setNewClient]=useState(false)
   useEffect(()=>{if(query.trim().length<2||client)return;const timer=setTimeout(()=>searchClients(query).then(setClients).catch(()=>setClients([])),250);return()=>clearTimeout(timer)},[query,client])
-  const submit=async(e:FormEvent)=>{e.preventDefault();const value=parseBrazilianMoney(amount);if(!client)return setError('Selecione um cliente.');if(!date)return setError('Informe a data da venda.');if(value===null||value<0)return setError('Informe um valor válido.')
-    setSaving(true);setError('');try{await createSale({clientId:client.id,date,amount:value,status,method,notes});setMessage('Venda salva e dashboard atualizado.');setTimeout(close,650)}catch(err){setError(err instanceof Error?err.message:'Falha ao salvar.')}finally{setSaving(false)}}
+  const submit=async(e:FormEvent)=>{e.preventDefault();if(saving)return;const value=parseBrazilianMoney(amount),volume=parseBrazilianMoney(ml),creditValue=credit?parseBrazilianMoney(credit):null;if(!client)return setError('Selecione um cliente.');if(!date)return setError('Informe a data da venda.');if(!perfume.trim())return setError('Informe o perfume.');if(value===null||value<0)return setError('Informe um valor válido.');if(volume===null||volume<0)return setError('Informe um volume em ML válido.');if(credit&&creditValue===null)return setError('Informe um crédito válido.')
+    setSaving(true);setError('');try{await createSale({clientId:client.id,date,amount:value,status,method,notes,perfume,saleType,volumeMl:volume,shippingDeadlineRaw:deadline||shippingStatus,shippingDeadlineDate:deadline,shippedAt,paidAt,creditReferenceAmount:creditValue});setMessage('Venda salva e dashboard atualizado.');setTimeout(close,650)}catch(err){setError(err instanceof Error?err.message:'Falha ao salvar.')}finally{setSaving(false)}}
   return <>{newClient&&<ClientModal close={()=>setNewClient(false)} onSaved={(c)=>{setClient(c);setQuery(c.name);setNewClient(false)}}/>}<Modal title="Adicionar venda" close={close}><form onSubmit={submit} className="record-form">
     <div className="form-grid"><div className="field wide client-search"><label>Cliente *</label><div className="search-control"><Search/><input value={query} placeholder="Busque pelo nome" onChange={(e)=>{setQuery(e.target.value);setClient(null)}}/><button type="button" onClick={()=>setNewClient(true)}><Plus/> Criar cliente</button></div>
       {!client&&clients.length>0&&<div className="client-results">{clients.map((c)=><button type="button" key={c.id} onClick={()=>{setClient(c);setQuery(c.name);setClients([])}}>{c.name}</button>)}</div>}</div>
       <DateField id="sale-date" label="Data da venda" value={date} onChange={setDate} required error={!date&&error?'Data obrigatória.':''}/>
+      <Field label="Perfume *" value={perfume} onChange={setPerfume} wide/>
+      <label className="field"><span>Tipo *</span><select value={saleType} onChange={(e)=>setSaleType(e.target.value as 'APC'|'SPLIT')}><option>APC</option><option>SPLIT</option></select></label>
+      <Field label="ML *" value={ml} onChange={setMl} placeholder="Ex.: 10"/>
       <Field label="Valor *" value={amount} onChange={setAmount} placeholder="R$ 0,00"/>
       <label className="field"><span>Status do pagamento</span><select value={status} onChange={(e)=>setStatus(e.target.value)}><option value="paid">Pago</option><option value="pending">Aguardando</option><option value="cancelled">Cancelado</option><option value="unknown">Em revisão</option></select></label>
       <label className="field"><span>Forma de pagamento</span><select value={method} onChange={(e)=>setMethod(e.target.value)}><option>PIX</option><option>CARTÃO DE CRÉDITO</option><option>DEPÓSITO</option><option>CRÉDITO E PIX</option><option>OUTRO</option></select></label>
+      <DateField id="paid-at" label="Data do pagamento" value={paidAt} onChange={setPaidAt}/>
+      <Field label="Crédito (referência)" value={credit} onChange={setCredit} placeholder="R$ 0,00"/>
+      <DateField id="shipping-deadline" label="Prazo de envio" value={deadline} onChange={setDeadline}/>
+      <Field label="Status operacional do envio" value={shippingStatus} onChange={setShippingStatus} placeholder="Ex.: PRONTA ENTREGA"/>
+      <DateField id="shipped-at" label="Data de envio" value={shippedAt} onChange={setShippedAt}/>
       <label className="field wide"><span>Observação</span><textarea value={notes} onChange={(e)=>setNotes(e.target.value)}/></label></div>
       <FormFeedback error={error} message={message}/><FormActions close={close} saving={saving} label="Salvar venda"/></form></Modal></>
 }

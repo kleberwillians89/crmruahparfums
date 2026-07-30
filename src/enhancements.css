@@ -50,6 +50,8 @@
 .ai-answer>span{font-size:11px;color:#a17b25;text-transform:uppercase;letter-spacing:.08em}
 .ai-answer p{margin:8px 0;line-height:1.55}
 .ai-answer h4{margin:16px 0 6px;font-size:11px;color:#75612f;text-transform:uppercase;letter-spacing:.06em}.ai-answer ul{margin:6px 0;padding-left:19px;color:#5d564d;font-size:11px;line-height:1.65}.ai-answer>small{display:block;margin-top:16px;color:#91887c;font-size:9px}
+.ai-answer{scroll-margin-top:110px}.ai-answer section{margin-top:18px;padding-top:2px}.ai-question{margin-bottom:18px;padding:12px 14px;border-left:3px solid #b68a25;background:#faf6ed;border-radius:0 8px 8px 0}.ai-question span{font-size:8px;color:#9a7628;text-transform:uppercase;letter-spacing:.08em}.ai-question p{margin:5px 0 0;color:#39342d;font-weight:600}.ai-direct{padding:17px!important;background:#27231e;color:#fff;border-radius:11px}.ai-direct h4{color:#d2b565;margin-top:0}.ai-direct h3{font:500 19px/1.45 'Playfair Display';margin:7px 0 0}.ai-metric-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.ai-metric-grid article{border:1px solid #ebe4d9;background:#fff;border-radius:10px;padding:13px;display:flex;flex-direction:column;min-width:0}.ai-metric-grid article>span{font-size:9px;color:#7d7468}.ai-metric-grid article>strong{font:600 17px 'Manrope';margin:7px 0 4px;overflow-wrap:anywhere}.ai-metric-grid article>p{font-size:9px;color:#928a7f;margin:0;line-height:1.45}.ask-again{margin-top:18px;min-height:42px;border:1px solid #dcd3c6;background:#fff;border-radius:8px;padding:0 14px;color:#7e6021;font-size:10px;font-weight:700}
+.ai-waiting{min-height:190px;display:flex;align-items:center;justify-content:center;gap:16px;text-align:left;padding:28px;background:linear-gradient(135deg,#faf7f0,#fff);border:1px solid #eee6d8;border-radius:11px;margin-bottom:18px}.ai-waiting>svg{width:32px;height:32px;color:#ad8228}.ai-waiting strong{font:600 14px 'Manrope'}.ai-waiting p{margin:5px 0 13px;color:#857d72;font-size:11px}.ai-waiting span{color:#9a7423;font-size:10px}
 .chat-input textarea{border:0;outline:0;flex:1;min-height:48px;max-height:130px;resize:vertical;padding:10px 9px;background:transparent;font:11px/1.45 'DM Sans',sans-serif}
 .chat-input button{width:auto!important;min-width:92px;min-height:44px;padding:0 13px!important;display:flex!important;gap:7px;align-items:center;justify-content:center;white-space:nowrap}
 .chat-input button:disabled{opacity:.5;cursor:not-allowed}.chat-input button span{font-size:10px;font-weight:700}.ai-error{display:flex;align-items:center;gap:9px;margin-top:10px}.ai-error .form-error{flex:1;margin:0}.ai-error>button{min-height:40px;border:1px solid #dfd5c9;border-radius:8px;background:#fff;padding:0 12px;display:flex;align-items:center;gap:7px;color:#72572a;font-size:10px}.ai-error svg{width:15px}
@@ -129,6 +131,7 @@ button,a,input,select,textarea{touch-action:manipulation}
   .chat-input button span{display:none}
   .ai-error{align-items:stretch;flex-direction:column}.ai-error>button{justify-content:center}
   .ai-answer{overflow-wrap:anywhere}
+  .intelligence-page{padding-inline:16px}.intelligence-hero{padding-top:8px;padding-bottom:14px}.intelligence-hero .hero-spark{width:43px;height:43px;margin-bottom:10px}.chat-box{width:100%;border-radius:10px}.ai-waiting{min-height:160px;padding:20px 14px}.ai-metric-grid{grid-template-columns:1fr 1fr}.ai-direct h3{font-size:17px}.ai-answer section{margin-top:15px}.ask-again{width:100%}
   .intelligence-hero{padding:18px 4px}
   .intelligence-hero h2{font-size:24px}
   .modal-panel{width:100%;height:100dvh}
@@ -147,4 +150,5 @@ button,a,input,select,textarea{touch-action:manipulation}
   .period-presets{grid-template-columns:1fr}
   header{padding:0 10px}
   .header-actions .avatar{display:none}
+  .ai-metric-grid{grid-template-columns:1fr}
 }

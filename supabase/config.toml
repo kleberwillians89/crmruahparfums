@@ -1,5 +1,21 @@
 project_id = "ruah-intelligence"
 
+[auth]
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:5173/auth/callback"]
+enable_signup = false
+minimum_password_length = 10
+
+[auth.email]
+enable_signup = true
+enable_confirmations = true
+max_frequency = "1m"
+otp_length = 8
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
 [functions.process-import]
 verify_jwt = true
 [functions.confirm-import]

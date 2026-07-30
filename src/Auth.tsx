@@ -1,0 +1,78 @@
+import { FormEvent, ReactNode, useEffect, useState } from 'react'
+import { Eye, EyeOff, LoaderCircle, LockKeyhole, LogOut, Mail, ShieldCheck } from 'lucide-react'
+import type { Session } from '@supabase/supabase-js'
+import { App } from './App'
+import { isSupabaseConfigured, supabase } from './lib/supabase'
+
+const go = (path:string) => { window.history.pushState({},'',path); window.dispatchEvent(new PopStateEvent('popstate')) }
+const message = (error:unknown) => {
+  const text=error instanceof Error?error.message:'Não foi possível concluir a operação.'
+  if(/invalid login/i.test(text))return 'E-mail ou senha incorretos.'
+  if(/email not confirmed/i.test(text))return 'Confirme seu e-mail antes de entrar.'
+  if(/rate limit/i.test(text))return 'Muitas tentativas. Aguarde alguns minutos.'
+  return 'Não foi possível concluir. Verifique os dados e tente novamente.'
+}
+
+function AuthLayout({title,subtitle,children}:{title:string;subtitle:string;children:ReactNode}) {
+  return <main className="auth-page"><section className="auth-brand-panel"><div className="auth-brand"><img src="/ruah-logo.jpg" alt="RUAH Parfums"/><span>RUAH PARFUMS</span></div><div><span>CRM E INTELIGÊNCIA COMERCIAL</span><h1>Inteligência que<br/>transforma relações.</h1><p>Dados comerciais protegidos para decisões mais precisas.</p></div><small><ShieldCheck/> Ambiente seguro RUAH</small></section>
+    <section className="auth-form-panel"><div className="auth-mobile-brand"><img src="/ruah-logo.jpg" alt="RUAH"/></div><div className="auth-box"><span>RUAH INTELLIGENCE</span><h2>{title}</h2><p>{subtitle}</p>{!isSupabaseConfigured&&<div className="auth-error">Configure as variáveis públicas do Supabase para autenticar.</div>}{children}</div></section></main>
+}
+
+export function LoginPage() {
+  const [email,setEmail]=useState(''),[password,setPassword]=useState(''),[show,setShow]=useState(false),[remember,setRemember]=useState(true)
+  const [loading,setLoading]=useState(false),[error,setError]=useState('')
+  const submit=async(e:FormEvent)=>{e.preventDefault();if(!supabase)return;setLoading(true);setError('')
+    const {error}=await supabase.auth.signInWithPassword({email:email.trim(),password})
+    if(error)setError(message(error));else{localStorage.setItem('ruah_remember',String(remember));sessionStorage.setItem('ruah_session','active');go('/')}setLoading(false)}
+  return <AuthLayout title="Bem-vinda de volta" subtitle="Entre para acessar o CRM e a inteligência comercial."><form className="auth-form" onSubmit={submit}>
+    <label><span>E-mail</span><div><Mail/><input type="email" autoComplete="email" required value={email} onChange={(e)=>setEmail(e.target.value)} placeholder="seu@email.com"/></div></label>
+    <label><span>Senha</span><div><LockKeyhole/><input type={show?'text':'password'} autoComplete="current-password" required value={password} onChange={(e)=>setPassword(e.target.value)} placeholder="Sua senha"/><button type="button" onClick={()=>setShow(!show)} aria-label={show?'Ocultar senha':'Mostrar senha'}>{show?<EyeOff/>:<Eye/>}</button></div></label>
+    <div className="auth-options"><label><input type="checkbox" checked={remember} onChange={(e)=>setRemember(e.target.checked)}/> Manter conectado</label><button type="button" onClick={()=>go('/recuperar-senha')}>Esqueci minha senha</button></div>
+    {error&&<div className="auth-error">{error}</div>}<button className="auth-submit" disabled={loading||!isSupabaseConfigured}>{loading?<LoaderCircle className="spin"/>:'Entrar'}</button>
+  </form></AuthLayout>
+}
+
+function EmailRecovery() {
+  const [email,setEmail]=useState(''),[loading,setLoading]=useState(false),[sent,setSent]=useState(false),[error,setError]=useState('')
+  const submit=async(e:FormEvent)=>{e.preventDefault();if(!supabase)return;setLoading(true);setError('')
+    const {error}=await supabase.auth.resetPasswordForEmail(email.trim(),{redirectTo:`${window.location.origin}/auth/callback?next=atualizar-senha`})
+    if(error)setError(message(error));else setSent(true);setLoading(false)}
+  return <AuthLayout title="Recuperar acesso" subtitle="Enviaremos um link seguro para o e-mail cadastrado.">{sent?<div className="auth-success">Confira sua caixa de entrada e também a pasta de spam.</div>:<form className="auth-form" onSubmit={submit}><label><span>E-mail</span><div><Mail/><input type="email" required value={email} onChange={(e)=>setEmail(e.target.value)}/></div></label>{error&&<div className="auth-error">{error}</div>}<button className="auth-submit" disabled={loading}>{loading?<LoaderCircle className="spin"/>:'Enviar link seguro'}</button></form>}<button className="auth-back" onClick={()=>go('/login')}>Voltar para o login</button></AuthLayout>
+}
+
+function PasswordPage({first=false}:{first?:boolean}) {
+  const [password,setPassword]=useState(''),[confirm,setConfirm]=useState(''),[show,setShow]=useState(false),[loading,setLoading]=useState(false),[error,setError]=useState('')
+  const submit=async(e:FormEvent)=>{e.preventDefault();if(!supabase)return;if(password.length<10)return setError('Use pelo menos 10 caracteres.');if(password!==confirm)return setError('As senhas não coincidem.')
+    setLoading(true);const {error}=await supabase.auth.updateUser({password});if(error)setError(message(error));else go('/');setLoading(false)}
+  return <AuthLayout title={first?'Defina sua senha':'Atualize sua senha'} subtitle="Crie uma senha forte e exclusiva para o RUAH Intelligence."><form className="auth-form" onSubmit={submit}>
+    {[['Nova senha',password,setPassword],['Confirmar senha',confirm,setConfirm]].map(([label,value,setter])=><label key={label as string}><span>{label as string}</span><div><LockKeyhole/><input type={show?'text':'password'} autoComplete="new-password" required value={value as string} onChange={(e)=>(setter as (x:string)=>void)(e.target.value)}/><button type="button" onClick={()=>setShow(!show)}>{show?<EyeOff/>:<Eye/>}</button></div></label>)}
+    {error&&<div className="auth-error">{error}</div>}<button className="auth-submit" disabled={loading}>{loading?<LoaderCircle className="spin"/>:'Salvar nova senha'}</button></form></AuthLayout>
+}
+
+function CallbackPage() {
+  const [error,setError]=useState('')
+  useEffect(()=>{const run=async()=>{if(!supabase)return setError('Supabase não configurado.')
+    const code=new URLSearchParams(location.search).get('code');if(code){const result=await supabase.auth.exchangeCodeForSession(code);if(result.error)return setError(message(result.error))}
+    const {data}=await supabase.auth.getSession();if(!data.session)return setError('O link expirou ou já foi utilizado.')
+    const next=new URLSearchParams(location.search).get('next');const type=new URLSearchParams(location.hash.slice(1)).get('type')
+    go(next==='atualizar-senha'||type==='recovery'?'/atualizar-senha':'/definir-senha')};run()},[])
+  return <AuthLayout title="Validando acesso" subtitle="Aguarde enquanto confirmamos seu link seguro.">{error?<div className="auth-error">{error}</div>:<LoaderCircle className="auth-loader spin"/>}</AuthLayout>
+}
+
+export function AuthRoot() {
+  const [path,setPath]=useState(location.pathname),[session,setSession]=useState<Session|null>(null),[ready,setReady]=useState(!supabase)
+  useEffect(()=>{const change=()=>setPath(location.pathname);addEventListener('popstate',change)
+    if(!supabase)return()=>removeEventListener('popstate',change)
+    supabase.auth.getSession().then(async({data})=>{if(data.session&&localStorage.getItem('ruah_remember')==='false'&&!sessionStorage.getItem('ruah_session'))await supabase!.auth.signOut();else setSession(data.session);setReady(true)})
+    const {data}=supabase.auth.onAuthStateChange((_event,next)=>setSession(next));return()=>{removeEventListener('popstate',change);data.subscription.unsubscribe()}},[])
+  if(!ready)return <div className="app-loading"><LoaderCircle className="spin"/></div>
+  const publicRoute=['/login','/recuperar-senha','/auth/callback','/definir-senha','/atualizar-senha'].includes(path)
+  if(!session&&!publicRoute){go('/login');return null}
+  if(session&&path==='/login'){go('/');return null}
+  if(path==='/login')return <LoginPage/>
+  if(path==='/recuperar-senha')return <EmailRecovery/>
+  if(path==='/auth/callback')return <CallbackPage/>
+  if(path==='/definir-senha')return <PasswordPage first/>
+  if(path==='/atualizar-senha')return <PasswordPage/>
+  return <><App/><button className="logout-fab" onClick={async()=>{await supabase?.auth.signOut();go('/login')}}><LogOut/> Sair</button></>
+}

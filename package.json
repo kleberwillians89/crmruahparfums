@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:configured": "node scripts/with-public-env.mjs npm run build",
+    "inspect:bundle": "node scripts/inspect-frontend-bundle.mjs",
     "lint": "eslint .",
     "test": "vitest run",
     "validate:workbook": "node scripts/validate-workbook.mjs",

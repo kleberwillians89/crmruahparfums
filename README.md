@@ -16,7 +16,7 @@ Sem variáveis, a interface abre em modo de simulação local e mostra somente o
 
 ```env
 VITE_SUPABASE_URL=https://pfhvqkzafgoyumxmbwqc.supabase.co
-VITE_SUPABASE_ANON_KEY=SUA_CHAVE_PUBLICA
+VITE_SUPABASE_PUBLISHABLE_KEY=SUA_CHAVE_PUBLICA
 ```
 
 Nunca coloque `SUPABASE_SERVICE_ROLE_KEY` ou `OPENAI_API_KEY` no frontend. Configure-as como secrets das Edge Functions.
@@ -97,7 +97,7 @@ Configure somente:
 
 ```env
 VITE_SUPABASE_URL=https://pfhvqkzafgoyumxmbwqc.supabase.co
-VITE_SUPABASE_ANON_KEY=definida diretamente na Vercel
+VITE_SUPABASE_PUBLISHABLE_KEY=definida diretamente na Vercel
 ```
 
 Build command: `npm run build`. Diretório de saída: `dist`.

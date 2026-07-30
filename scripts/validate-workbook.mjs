@@ -43,16 +43,17 @@ const parsed = rows.map((r) => {
   return { sourceRow:r.__sourceRow, rawClient, client, saleDate, amount: amount ?? 0, hasNumericAmount:amount!==null, operationalLabel, paymentStatus, rawStatus:String(r.PAGAMENTO??'').trim()||'(vazio)', paymentMethod: String(r['FORMA DE PAGAMENTO'] ?? '').trim() || 'Não informado', importable, accountable, warnings, blockers, duplicate }
 })
 const validRows = parsed.filter((r) => r.importable)
-const accountableRows = parsed.filter((r)=>r.accountable)
+const financialRows = parsed.filter((r)=>r.hasNumericAmount)
+const accountableRows = financialRows.filter((r)=>r.saleDate && ['paid','pending'].includes(r.paymentStatus))
 const clientRows = parsed.filter((r)=>r.client&&!r.operationalLabel)
 const sum = (items) => Math.round(items.reduce((a,b)=>a+b.amount,0)*100)/100
 const group = (key, value = () => 1, items=validRows) => Object.entries(items.reduce((acc,r)=>{const k=key(r);acc[k]=(acc[k]||0)+value(r);return acc},{})).map(([name,v])=>({name,value:Math.round(v*100)/100})).sort((a,b)=>b.value-a.value)
 const monthlyRaw = group((r)=>r.saleDate.slice(0,7),(r)=>r.amount,accountableRows).sort((a,b)=>a.name.localeCompare(b.name))
 const partition = {
-  paid: validRows.filter((r)=>r.paymentStatus==='paid'),
-  pending: validRows.filter((r)=>r.paymentStatus==='pending'),
-  cancelled: validRows.filter((r)=>r.paymentStatus==='cancelled'),
-  review: validRows.filter((r)=>r.paymentStatus==='unknown'),
+  paid: financialRows.filter((r)=>r.paymentStatus==='paid'),
+  pending: financialRows.filter((r)=>r.paymentStatus==='pending'),
+  cancelled: financialRows.filter((r)=>r.paymentStatus==='cancelled'),
+  review: financialRows.filter((r)=>r.paymentStatus==='unknown'),
 }
 const oldStrict = validRows.filter((r)=>r.saleDate && r.paymentStatus!=='unknown' && r.paymentMethod!=='Não informado')
 const clientVariantMap = new Map()
@@ -75,10 +76,10 @@ const report = {
   normalizedClientNames:new Set(clientRows.map((r)=>r.client)).size,
   importedValue:sum(validRows), revenue:sum(accountableRows),
   grossToDashboardDifference:Math.round((sum(parsed.filter((r)=>r.hasNumericAmount))-sum(accountableRows))*100)/100,
-  paid:sum(validRows.filter((r)=>r.paymentStatus==='paid')),
-  pending:sum(validRows.filter((r)=>r.paymentStatus==='pending')),
-  cancelled:sum(validRows.filter((r)=>r.paymentStatus==='cancelled')),
-  reviewValue:sum(validRows.filter((r)=>r.paymentStatus==='unknown')),
+  paid:sum(partition.paid),
+  pending:sum(partition.pending),
+  cancelled:sum(partition.cancelled),
+  reviewValue:sum(partition.review),
   rejectionReasonCounts:{
     missing_client:parsed.filter((r)=>r.blockers.includes('missing_client')).length,
     invalid_amount:parsed.filter((r)=>r.blockers.includes('invalid_amount')).length,
@@ -90,7 +91,7 @@ const report = {
     value:r.hasNumericAmount?Math.round(r.amount*100)/100:null,
   })),
   reconciliation: {
-    gross_with_client_and_value:{lines:validRows.length,value:sum(validRows)},
+    gross_with_client_and_value:{lines:financialRows.length,value:sum(financialRows)},
     paid:{lines:partition.paid.length,value:sum(partition.paid)},
     pending:{lines:partition.pending.length,value:sum(partition.pending)},
     cancelled:{lines:partition.cancelled.length,value:sum(partition.cancelled)},
@@ -104,7 +105,7 @@ const report = {
   },
   previous_report:{valid_value:1563985.48,dashboard_revenue:1560267.48,strict_recalculated:sum(oldStrict),difference_gross_vs_previous:Math.round((sum(validRows)-1563985.48)*100)/100},
   paymentMethods:group((r)=>r.paymentMethod),
-  statusCounts:group((r)=>r.paymentStatus),
+  statusCounts:group((r)=>r.paymentStatus,()=>1,financialRows),
   monthly:monthlyRaw.map(({name,value})=>({month:name,revenue:value}))
 }
 fs.writeFileSync(output, `${JSON.stringify(report,null,2)}\n`)

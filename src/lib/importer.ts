@@ -111,7 +111,7 @@ export function parseRows(fileName: string, sheets: string[], sheetName: string,
     if (isDuplicate) { warnings.push('Possível duplicidade'); duplicates += 1 }
     seen.add(sig)
     const isImportable = blockers.length === 0
-    const isAccountable = isImportable && Boolean(date) && paymentStatus !== 'unknown' && paymentStatus !== 'cancelled'
+    const isAccountable = amount !== null && amount >= 0 && Boolean(date) && ['paid','pending'].includes(paymentStatus)
     return {
       row: index + 2, client, normalizedClient, date, amount, paymentStatus, paymentMethod,
       note: String(source['OBSERVAÇÃO'] ?? '').trim(), signature: sig, raw: source,
@@ -121,15 +121,16 @@ export function parseRows(fileName: string, sheets: string[], sheetName: string,
     .filter((row) => normalizeClient(row.client) !== 'total:')
   const accepted = rows.filter((r) => r.isImportable)
   const accountable = rows.filter((r) => r.isAccountable)
-  const review = accepted.filter((r) => !r.isAccountable && r.paymentStatus !== 'cancelled')
+  const financialRows = rows.filter((r) => r.amount !== null && r.amount >= 0)
+  const review = financialRows.filter((r) => r.paymentStatus === 'unknown')
   return {
     fileName, sheets, selectedSheet: sheetName, totalRows: rows.length,
     rows, valid: accepted.length, rejected: rows.length - accepted.length, duplicates,
     uniqueClients: new Set(accepted.map((r) => r.normalizedClient)).size,
     revenue: accountable.reduce((sum, r) => sum + (r.amount ?? 0), 0),
-    importedValue: accepted.reduce((sum, r) => sum + (r.amount ?? 0), 0),
+    importedValue: financialRows.reduce((sum, r) => sum + (r.amount ?? 0), 0),
     reviewValue: review.reduce((sum, r) => sum + (r.amount ?? 0), 0),
-    cancelledValue: accepted.filter((r) => r.paymentStatus === 'cancelled').reduce((sum, r) => sum + (r.amount ?? 0), 0),
+    cancelledValue: financialRows.filter((r) => r.paymentStatus === 'cancelled').reduce((sum, r) => sum + (r.amount ?? 0), 0),
     qualityPercent: rows.length ? accountable.length / rows.length * 100 : 0,
   }
 }

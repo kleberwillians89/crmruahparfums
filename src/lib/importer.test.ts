@@ -78,5 +78,15 @@ describe('importação', () => {
     ])
     expect(preview.valid).toBe(0)
     expect(preview.rows[0].blockers).toContain('Rótulo operacional, não é cliente')
+    expect(preview.rows[0].paymentStatus).toBe('pending')
+    expect(preview.rows[0].isAccountable).toBe(true)
+  })
+  it('preserva crédito no bruto sem somá-lo como valor da venda', () => {
+    const preview = parseRows('teste.xlsx',['PERFUMES'],'PERFUMES',[
+      ['CLIENTE','DATA','PERFUME','VALOR','PAGAMENTO','FORMA DE PAGAMENTO','CRÉDITO'],
+      ['PESSOA UM',new Date('2026-07-01'),'PERFUME A',100,'PAGO','CARTÃO DE CRÉDITO',6287.35],
+    ])
+    expect(preview.importedValue).toBe(100)
+    expect(preview.rows[0].raw['CRÉDITO']).toBe(6287.35)
   })
 })

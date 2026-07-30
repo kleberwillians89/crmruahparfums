@@ -19,12 +19,12 @@
   "exactClientNames": 419,
   "normalizedClientNames": 418,
   "importedValue": 1669948.58,
-  "revenue": 1652810.18,
-  "grossToDashboardDifference": 20880.6,
+  "revenue": 1654150.38,
+  "grossToDashboardDifference": 19540.4,
   "paid": 1561552.38,
-  "pending": 91257.8,
+  "pending": 92598,
   "cancelled": 5159,
-  "reviewValue": 11979.4,
+  "reviewValue": 14381.4,
   "rejectionReasonCounts": {
     "missing_client": 1,
     "invalid_amount": 18,
@@ -272,24 +272,24 @@
   ],
   "reconciliation": {
     "gross_with_client_and_value": {
-      "lines": 5892,
-      "value": 1669948.58
+      "lines": 5908,
+      "value": 1673690.78
     },
     "paid": {
       "lines": 5495,
       "value": 1561552.38
     },
     "pending": {
-      "lines": 354,
-      "value": 91257.8
+      "lines": 362,
+      "value": 92598
     },
     "cancelled": {
       "lines": 8,
       "value": 5159
     },
     "unstandardized_status": {
-      "lines": 35,
-      "value": 11979.4
+      "lines": 43,
+      "value": 14381.4
     },
     "invalid_or_missing_date": {
       "lines": 0,
@@ -304,12 +304,12 @@
       "value": 0
     },
     "dashboard_accounted": {
-      "lines": 5849,
-      "value": 1652810.18
+      "lines": 5857,
+      "value": 1654150.38
     },
     "excluded_from_revenue": {
-      "lines": 43,
-      "value": 17138.4
+      "lines": 51,
+      "value": 19540.4
     },
     "impossible_without_client": {
       "lines": 1,
@@ -395,11 +395,11 @@
     },
     {
       "name": "pending",
-      "value": 354
+      "value": 362
     },
     {
       "name": "unknown",
-      "value": 35
+      "value": 43
     },
     {
       "name": "cancelled",
@@ -421,19 +421,19 @@
     },
     {
       "month": "2026-04",
-      "revenue": 239431.4
+      "revenue": 239679.2
     },
     {
       "month": "2026-05",
-      "revenue": 388440.8
+      "revenue": 388805.6
     },
     {
       "month": "2026-06",
-      "revenue": 326695.38
+      "revenue": 326853.88
     },
     {
       "month": "2026-07",
-      "revenue": 327460.3
+      "revenue": 328029.4
     }
   ]
 }

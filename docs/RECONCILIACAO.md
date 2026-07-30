@@ -18,15 +18,15 @@ As quatro categorias de status abaixo são mutuamente exclusivas e fecham exatam
 
 | Categoria | Linhas | Valor |
 |---|---:|---:|
-| Total bruto de vendas identificáveis | 5.892 | R$ 1.669.948,58 |
+| Total bruto numérico da coluna VALOR | 5.908 | R$ 1.673.690,78 |
 | Pago | 5.495 | R$ 1.561.552,38 |
-| Aguardando | 354 | R$ 91.257,80 |
+| Aguardando | 362 | R$ 92.598,00 |
 | Cancelado | 8 | R$ 5.159,00 |
-| Status não padronizado | 35 | R$ 11.979,40 |
-| Total incluído no dashboard | 5.849 | R$ 1.652.810,18 |
-| Total excluído do faturamento | 43 | R$ 17.138,40 |
+| Status não padronizado | 43 | R$ 14.381,40 |
+| Total incluído no dashboard | 5.857 | R$ 1.654.150,38 |
+| Total excluído do faturamento | 51 | R$ 19.540,40 |
 
-Conferência: pago + aguardando + cancelado + revisão = **R$ 1.669.948,58**.
+Conferência: pago + aguardando + cancelado + revisão = **R$ 1.673.690,78**.
 
 ## Qualidade e sobreposições
 
@@ -40,7 +40,7 @@ Estas categorias são marcadores de qualidade e podem se sobrepor às categorias
 | Valor presente, cliente ausente | 1 | R$ 1.486,00 |
 | Rótulo `DISPONÍVEL PARA VENDA` | 15 | R$ 2.256,20 |
 
-A aba possui 5.925 linhas preenchidas na coluna CLIENTE. Quinze delas usam o rótulo operacional `DISPONÍVEL PARA VENDA`, que representa estoque e não uma pessoa. Restam 420 nomes de exibição e 418 clientes após normalização exata. Nenhum nome é unido por similaridade.
+A aba possui 5.925 linhas preenchidas na coluna CLIENTE. Quinze delas usam o rótulo operacional `DISPONÍVEL PARA VENDA`, que representa estoque e não uma pessoa. Restam 419 nomes de exibição e 418 clientes após normalização exata. Nenhum nome é unido por similaridade. O alerta de estoque não altera o status financeiro: oito dessas linhas permanecem classificadas literalmente como `AGUARDANDO`.
 
 A simulação encontrou dois grupos de colisão de normalização (quatro grafias brutas envolvidas). Eles permanecem na fila de revisão; nenhuma união automática será feita.
 

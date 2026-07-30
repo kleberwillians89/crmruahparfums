@@ -6,8 +6,8 @@ import {
   UploadCloud, UserRound, UsersRound, X, AlertTriangle, ArrowUpRight,
 } from 'lucide-react'
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { brl, integer, monthLabel } from './lib/format'
-import { ImportPreview, ParsedSale, readWorkbook } from './lib/importer'
+import { brl, integer, monthLabel, shortDate } from './lib/format'
+import { ImportPreview, ParsedSale, isOperationalClientLabel, readWorkbook } from './lib/importer'
 import report from './data/validation-report.json'
 import { ClientModal, SaleModal } from './components/RecordModals'
 
@@ -229,16 +229,52 @@ function GenericPage({ page }: { page: Page }) {
   </div>
 }
 
+type ClientSummary = {
+  name:string; total:number; paid:number; pending:number; cancelled:number; review:number
+  items:number; first:string; last:string
+}
+
+function ClientsPage({ preview, openImport }: { preview:ImportPreview|null; openImport:()=>void }) {
+  const [modal,setModal]=useState(false)
+  const clients=useMemo(()=>{
+    if(!preview)return []
+    const grouped=new Map<string,ClientSummary>()
+    for(const row of preview.rows){
+      if(!row.normalizedClient||isOperationalClientLabel(row.client))continue
+      const current=grouped.get(row.normalizedClient)??{name:row.client,total:0,paid:0,pending:0,cancelled:0,review:0,items:0,first:'',last:''}
+      if(row.amount!==null){
+        current.total+=row.amount;current.items+=1
+        if(row.paymentStatus==='paid')current.paid+=row.amount
+        else if(row.paymentStatus==='pending')current.pending+=row.amount
+        else if(row.paymentStatus==='cancelled')current.cancelled+=row.amount
+        else current.review+=row.amount
+      }
+      if(row.date){if(!current.first||row.date<current.first)current.first=row.date;if(!current.last||row.date>current.last)current.last=row.date}
+      grouped.set(row.normalizedClient,current)
+    }
+    return [...grouped.values()].sort((a,b)=>b.paid-a.paid||a.name.localeCompare(b.name,'pt-BR'))
+  },[preview])
+  return <div className="page">{modal&&<ClientModal close={()=>setModal(false)}/>}
+    <div className="page-lead"><div><h2>Clientes</h2><p>Relacionamento, recorrência e histórico em um só lugar.</p></div><button className="primary" onClick={()=>setModal(true)}><Plus size={17}/> Adicionar cliente</button></div>
+    {!preview?<div className="empty card"><div className="empty-icon"><UserRound/></div><h3>Carregue a planilha para revisar os 418 clientes</h3><p>O dry-run é local e não grava dados no Supabase.</p><button className="primary" onClick={openImport}><Import size={17}/> Abrir importação</button></div>:
+    <div className="card clients-table"><div className="clients-caption"><div><strong>{integer(clients.length)} clientes no dry-run</strong><span>Ordenados por valor pago, do maior para o menor</span></div><span className="badge pending">SIMULAÇÃO</span></div>
+      <div className="table-wrap"><table><thead><tr><th>Cliente</th><th>Total comprado</th><th>Pago</th><th>Aguardando</th><th>Cancelado</th><th>Em revisão</th><th>Itens</th><th>Ticket médio</th><th>Primeira compra</th><th>Última compra</th></tr></thead>
+      <tbody>{clients.map((c)=><tr key={c.name}><td><strong>{c.name}</strong></td><td>{brl(c.total)}</td><td>{brl(c.paid)}</td><td>{brl(c.pending)}</td><td>{brl(c.cancelled)}</td><td>{brl(c.review)}</td><td>{integer(c.items)}</td><td>{brl(c.items?c.total/c.items:0)}</td><td>{c.first?shortDate(`${c.first}T12:00:00`):'—'}</td><td>{c.last?shortDate(`${c.last}T12:00:00`):'—'}</td></tr>)}</tbody></table></div>
+    </div>}
+  </div>
+}
+
 export function App() {
   const [page, setPage] = useState<Page>('Visão Geral')
   const [menuOpen, setMenuOpen] = useState(false)
-  const [, setPreview] = useState<ImportPreview | null>(null)
+  const [preview, setPreview] = useState<ImportPreview | null>(null)
   const content = useMemo<ReactNode>(() => {
     if (page === 'Visão Geral') return <Dashboard/>
+    if (page === 'Clientes') return <ClientsPage preview={preview} openImport={()=>setPage('Importar Dados')}/>
     if (page === 'Importar Dados') return <ImportPage onPreview={setPreview}/>
     if (page === 'RUAH Intelligence') return <Intelligence/>
     if (page === 'Insights') return <Insights/>
     return <GenericPage page={page}/>
-  }, [page])
+  }, [page,preview])
   return <div className="app-shell"><Sidebar page={page} setPage={setPage} open={menuOpen} close={()=>setMenuOpen(false)}/><main><Header page={page} menu={()=>setMenuOpen(true)}/>{content}</main></div>
 }

@@ -49,6 +49,10 @@
 .ai-answer{text-align:left;padding:8px 4px 18px}
 .ai-answer>span{font-size:11px;color:#a17b25;text-transform:uppercase;letter-spacing:.08em}
 .ai-answer p{margin:8px 0;line-height:1.55}
+.ai-answer h4{margin:16px 0 6px;font-size:11px;color:#75612f;text-transform:uppercase;letter-spacing:.06em}.ai-answer ul{margin:6px 0;padding-left:19px;color:#5d564d;font-size:11px;line-height:1.65}.ai-answer>small{display:block;margin-top:16px;color:#91887c;font-size:9px}
+.chat-input textarea{border:0;outline:0;flex:1;min-height:48px;max-height:130px;resize:vertical;padding:10px 9px;background:transparent;font:11px/1.45 'DM Sans',sans-serif}
+.chat-input button{width:auto!important;min-width:92px;min-height:44px;padding:0 13px!important;display:flex!important;gap:7px;align-items:center;justify-content:center;white-space:nowrap}
+.chat-input button:disabled{opacity:.5;cursor:not-allowed}.chat-input button span{font-size:10px;font-weight:700}.ai-error{display:flex;align-items:center;gap:9px;margin-top:10px}.ai-error .form-error{flex:1;margin:0}.ai-error>button{min-height:40px;border:1px solid #dfd5c9;border-radius:8px;background:#fff;padding:0 12px;display:flex;align-items:center;gap:7px;color:#72572a;font-size:10px}.ai-error svg{width:15px}
 @media(max-width:900px){
   .period-popover{position:fixed;inset:70px 12px 12px;width:auto;grid-template-columns:1fr;overflow:auto}
   .period-presets{display:grid;grid-template-columns:1fr 1fr;border-right:0;border-bottom:1px solid #eee7dc}
@@ -120,8 +124,10 @@ button,a,input,select,textarea{touch-action:manipulation}
   .suggestions button{min-height:48px;font-size:11px}
   .chat-box{padding:14px}
   .chat-input{position:sticky;bottom:8px;background:#fff;z-index:2}
-  .chat-input input{min-height:44px;font-size:16px}
-  .chat-input button{width:44px;height:44px;flex:0 0 44px}
+  .chat-input textarea{min-height:52px;font-size:16px}
+  .chat-input button{min-width:44px;width:44px!important;height:44px;flex:0 0 44px;padding:0!important}
+  .chat-input button span{display:none}
+  .ai-error{align-items:stretch;flex-direction:column}.ai-error>button{justify-content:center}
   .ai-answer{overflow-wrap:anywhere}
   .intelligence-hero{padding:18px 4px}
   .intelligence-hero h2{font-size:24px}

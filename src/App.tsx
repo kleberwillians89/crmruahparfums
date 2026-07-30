@@ -1,7 +1,7 @@
-import { ChangeEvent, ReactNode, useEffect, useMemo, useState } from 'react'
+import { ChangeEvent, ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Bell, Bot, CalendarDays, ChartNoAxesCombined, Check, ChevronDown, CircleHelp,
-  Boxes, Clock3, Download, FileSpreadsheet, FileText, Home, Import, Lightbulb, Menu,
+  Boxes, Clock3, Download, FileSpreadsheet, FileText, Home, Import, Lightbulb, LoaderCircle, Menu,
   MoreHorizontal, Plus, RotateCcw, Search, Settings, ShoppingBag, SlidersHorizontal, Sparkles, TrendingUp,
   Truck, UploadCloud, UserRound, UsersRound, X, AlertTriangle, ArrowUpRight,
 } from 'lucide-react'
@@ -210,14 +210,17 @@ function PreviewRow({ row }: { row: ParsedSale }) {
 function Intelligence({period,setPeriod}:{period:PeriodValue;setPeriod:(value:PeriodValue)=>void}) {
   const suggestions = ['Como estão as vendas deste mês?', 'Quanto ainda está aguardando?', 'Quais entregas estão atrasadas?', 'Quais perfumes estão acabando?', 'O que devo repor primeiro?', 'Existem vendas sem estoque suficiente?']
   const [question,setQuestion]=useState(''),[answer,setAnswer]=useState<Record<string,unknown>|null>(null),[loading,setLoading]=useState(false),[error,setError]=useState('')
-  const submit=async(text=question)=>{if(!text.trim()||loading)return;setLoading(true);setError('');try{setAnswer(await askIntelligence(text,period));setQuestion(text)}catch(err){setError(err instanceof Error?err.message:'A inteligência está indisponível.')}finally{setLoading(false)}}
+  const [lastQuestion,setLastQuestion]=useState(''),[meta,setMeta]=useState<{run_id:string;status:string;retried:boolean;duration_ms:number}|null>(null)
+  const requestActive=useRef(false)
+  const submit=async(text=question)=>{const clean=text.trim();if(!clean||requestActive.current)return;requestActive.current=true;setQuestion(clean);setLastQuestion(clean);setLoading(true);setError('');setMeta(null);try{const result=await askIntelligence(clean,period);setAnswer(result.answer);setMeta(result.meta);setQuestion('')}catch(err){setError(err instanceof Error?err.message:'A inteligência está indisponível.')}finally{requestActive.current=false;setLoading(false)}}
+  const renderList=(value:unknown)=>Array.isArray(value)?<ul>{value.map((item,index)=><li key={index}>{String(item)}</li>)}</ul>:<p>{String(value??'')}</p>
   return <div className="page intelligence-page"><div className="page-lead"><div><h2>RUAH Intelligence</h2><p>Análise consultiva baseada apenas em agregados reais.</p></div><PeriodFilter value={period} onApply={setPeriod}/></div>
     <div className="intelligence-hero"><div className="hero-spark"><Sparkles/></div><span>RUAH INTELLIGENCE</span><h2>Decisões mais claras começam<br/>com as perguntas certas.</h2><p>Respostas baseadas exclusivamente nos dados autorizados da sua operação.</p></div>
     <div className="chat-box card">
-      {!answer?<div className="chat-empty"><Bot/><h3>Como posso ajudar hoje?</h3><p>Escolha uma sugestão ou escreva uma pergunta sobre os dados da RUAH.</p></div>:<div className="ai-answer"><span>Período: {String(answer.periodo_analisado??period.label)}</span><h3>{String(answer.resumo??'Análise concluída')}</h3><p>{String(answer.evidencias??'')}</p><p><strong>Insights:</strong> {String(answer.insights??'')}</p><p><strong>Recomendações:</strong> {String(answer.recomendacoes??'')}</p><p><strong>Próximas ações:</strong> {String(answer.proximas_acoes??'')}</p></div>}
+      {!answer?<div className="chat-empty"><Bot/><h3>Como posso ajudar hoje?</h3><p>Escolha uma sugestão ou escreva uma pergunta sobre os dados da RUAH.</p></div>:<div className="ai-answer"><span>Período: {String(answer.periodo_analisado??period.label)}</span><h3>{String(answer.resumo??'Análise concluída')}</h3><h4>Evidências</h4>{renderList(answer.evidencias)}<h4>Insights</h4>{renderList(answer.insights)}<h4>Recomendações</h4>{renderList(answer.recomendacoes)}<h4>Próximas ações</h4>{renderList(answer.proximas_acoes)}{meta&&<small>Análise concluída · {Math.round(meta.duration_ms/1000)}s · protocolo {meta.run_id.slice(0,8)}</small>}</div>}
       <div className="suggestions">{suggestions.map(x=><button key={x} onClick={()=>submit(x)}>{x}<ArrowUpRight size={14}/></button>)}</div>
-      <div className="chat-input"><input value={question} onChange={(event)=>setQuestion(event.target.value)} maxLength={1000} placeholder="Pergunte sobre faturamento, clientes, pagamentos…"/><button disabled={loading} onClick={()=>submit()}>{loading?<Clock3/>:<ArrowUpRight/>}</button></div>
-      {error&&<div className="form-error">{error}</div>}
+      <div className="chat-input"><textarea value={question} onChange={(event)=>setQuestion(event.target.value)} onKeyDown={(event)=>{if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();submit()}}} maxLength={1000} rows={2} placeholder="Pergunte sobre faturamento, clientes, pagamentos…"/><button aria-label="Enviar pergunta" title="Enviar pergunta" disabled={loading||!question.trim()} onClick={()=>submit()}>{loading?<><LoaderCircle className="spin"/><span>Analisando…</span></>:<><ArrowUpRight/><span>Enviar</span></>}</button></div>
+      {error&&<div className="ai-error"><div className="form-error">{error}</div><button onClick={()=>submit(lastQuestion)} disabled={loading}><RotateCcw/> Tentar novamente</button></div>}
       <small><span className="dot"/> A IA só acessa métricas agregadas e autorizadas</small>
     </div>
   </div>

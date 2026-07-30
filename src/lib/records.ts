@@ -148,8 +148,8 @@ export async function askIntelligence(question:string,period:PeriodValue) {
   }})
   if(error){
     const response=(error as {context?:Response}).context
-    let code=''
-    try{code=String((await response?.clone().json())?.error?.code??'')}catch{/* resposta sem JSON */}
+    let code='',runId=''
+    try{const body=await response?.clone().json();code=String(body?.error?.code??'');runId=String(body?.error?.run_id??'')}catch{/* resposta sem JSON */}
     const messages:Record<string,string>={
       unauthorized:'Sua sessão expirou. Entre novamente para continuar.',
       rate_limit:'O limite de análises foi atingido. Aguarde um minuto.',
@@ -158,6 +158,8 @@ export async function askIntelligence(question:string,period:PeriodValue) {
       OPENAI_RATE_LIMIT:'O limite da inteligência foi atingido. Tente mais tarde.',
       OPENAI_TIMEOUT:'A análise excedeu o tempo esperado. Tente novamente.',
       OPENAI_INVALID_RESPONSE:'A resposta recebida não passou na validação de segurança.',
+      OPENAI_MAX_OUTPUT_TOKENS:'A análise ficou extensa demais. Tente novamente.',
+      OPENAI_PROVIDER_ERROR:'Não foi possível concluir a análise agora.',
       OPENAI_SECRET_MISSING:'O serviço de inteligência ainda não está configurado.',
       AGGREGATE_QUERY_FAILED:'Não foi possível preparar os agregados comerciais.',
       ai_failed:'A OpenAI não conseguiu concluir a análise agora.',
@@ -166,10 +168,11 @@ export async function askIntelligence(question:string,period:PeriodValue) {
       metrics_error:'Não foi possível preparar os agregados comerciais.',
       origin_forbidden:'Esta origem não está autorizada a acessar a inteligência.',
     }
-    throw new Error(messages[code]??(response?'A inteligência retornou um erro interno.':'Falha de conexão com a inteligência.'))
+    const support=runId?` Código de suporte: ${runId.slice(0,8)}.`:code?` Código: ${code}.`:''
+    throw new Error((messages[code]??(response?'A inteligência retornou um erro interno.':'Falha de conexão com a inteligência.'))+support)
   }
   if(data?.error)throw new Error(data.error.message)
-  return data.data
+  return {answer:data.data as Record<string,unknown>,meta:data.meta as {run_id:string;status:string;retried:boolean;duration_ms:number}}
 }
 
 export type PerfumeCommercialSummary = {

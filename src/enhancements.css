@@ -35,6 +35,16 @@
 .period-actions{display:flex;justify-content:flex-end;gap:8px;border-top:1px solid #eee7dc;padding-top:12px}
 .period-actions button{display:flex;align-items:center;gap:6px;padding:9px 13px}
 .sales-filters{display:grid;grid-template-columns:minmax(240px,2fr) repeat(5,minmax(130px,1fr));gap:8px}
+.sales-filter-panel{margin-bottom:14px;padding:12px}
+.filter-primary{display:grid;grid-template-columns:minmax(280px,1fr) 190px 160px auto auto;gap:10px;align-items:center}
+.filter-primary .search{height:44px;background:#fff}
+.filter-primary select,.filter-secondary input,.filter-secondary select{width:100%;height:44px;border:1px solid #ded7cc;border-radius:9px;background:#fff;padding:0 12px;color:#4b443b;outline:0;font-size:12px}
+.filter-primary select:focus,.filter-secondary input:focus,.filter-secondary select:focus{border-color:#ae8329;box-shadow:0 0 0 3px #b88b2d16}
+.filter-toggle,.filter-clear{height:44px;border:1px solid #ded7cc;border-radius:9px;background:#fff;padding:0 13px;display:flex;align-items:center;justify-content:center;gap:8px;color:#514a40;font-size:11px;font-weight:600;white-space:nowrap}
+.filter-toggle svg,.filter-clear svg{width:16px}.filter-toggle.active{border-color:#b58a30;background:#fbf6e9;color:#89661d}
+.filter-toggle i{font-style:normal;display:grid;place-items:center;min-width:19px;height:19px;padding:0 5px;border-radius:10px;background:#aa7f24;color:#fff;font-size:9px}
+.filter-clear{color:#8b5a4f}.filter-secondary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:12px;padding-top:12px;border-top:1px solid #eee8df}
+.filter-secondary label{display:flex;flex-direction:column;gap:6px;min-width:0}.filter-secondary label span{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#81786c}
 .toolbar select{border:1px solid #e4ddd2;border-radius:9px;padding:9px;background:#fff;color:#4b4439}
 .ai-answer{text-align:left;padding:8px 4px 18px}
 .ai-answer>span{font-size:11px;color:#a17b25;text-transform:uppercase;letter-spacing:.08em}
@@ -44,10 +54,12 @@
   .period-presets{display:grid;grid-template-columns:1fr 1fr;border-right:0;border-bottom:1px solid #eee7dc}
   .period-calendar .rdp-months{flex-direction:column}
   .sales-filters{grid-template-columns:1fr 1fr}
+  .filter-primary{grid-template-columns:1fr 1fr}.filter-primary .search{grid-column:1/-1}.filter-secondary{grid-template-columns:1fr 1fr}
 }
 @media(max-width:560px){
   .period-inputs{align-items:stretch;flex-direction:column}
   .sales-filters{grid-template-columns:1fr}
+  .sales-filter-panel{padding:10px}.filter-primary,.filter-secondary{grid-template-columns:1fr}.filter-primary .search{grid-column:auto}.filter-toggle,.filter-clear{width:100%}
   .page-actions{width:100%}
   .page-actions>*{flex:1}
 }

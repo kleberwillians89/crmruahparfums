@@ -2,7 +2,7 @@ import { ChangeEvent, ReactNode, useEffect, useMemo, useState } from 'react'
 import {
   Bell, Bot, CalendarDays, ChartNoAxesCombined, Check, ChevronDown, CircleHelp,
   Boxes, Clock3, Download, FileSpreadsheet, FileText, Home, Import, Lightbulb, Menu,
-  MoreHorizontal, Plus, Search, Settings, ShoppingBag, Sparkles, TrendingUp,
+  MoreHorizontal, Plus, RotateCcw, Search, Settings, ShoppingBag, SlidersHorizontal, Sparkles, TrendingUp,
   Truck, UploadCloud, UserRound, UsersRound, X, AlertTriangle, ArrowUpRight,
 } from 'lucide-react'
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
@@ -92,7 +92,7 @@ function Dashboard({period,setPeriod}:{period:PeriodValue;setPeriod:(value:Perio
   const colors = ['#bf9636', '#332f29', '#817768', '#ded6c8', '#9f7c2b']
   return <div className="page">
     <div className="page-lead">
-      <div><h2>O pulso comercial da RUAH</h2><p>Indicadores consolidados para decisões mais precisas.</p></div>
+      <div><h2>Visão geral das vendas</h2><p>Acompanhe os principais números da RUAH.</p></div>
       <PeriodFilter value={period} onApply={setPeriod}/>
     </div>
     {loadError && <div className="notice"><AlertTriangle size={18} /><span>{loadError}</span></div>}
@@ -285,22 +285,32 @@ function SalesPage({period,setPeriod}:{period:PeriodValue;setPeriod:(value:Perio
   const [count,setCount]=useState(0)
   const [page,setPage]=useState(0),[loading,setLoading]=useState(true),[error,setError]=useState('')
   const [filters,setFilters]=useState<SaleFilters>({period,sort:'sale_date_desc'})
+  const [showMoreFilters,setShowMoreFilters]=useState(false)
   const setFilter=(key:keyof SaleFilters,value:string)=>{setPage(0);setFilters((current)=>({...current,[key]:value||undefined}))}
+  const activeFilterCount=Object.entries(filters).filter(([key,value])=>key!=='period'&&key!=='sort'&&value!==undefined&&value!=='').length
+  const clearFilters=()=>{setPage(0);setFilters({period,sort:'sale_date_desc'})}
   useEffect(()=>{fetchSalesPage({...filters,period},page,50).then((result)=>{setSales(result.rows);setCount(result.count)}).catch(()=>setError('Não foi possível consultar as vendas.')).finally(()=>setLoading(false))},[filters,page,period])
   const total=sales.reduce((sum,sale)=>sum+Number(sale.amount),0)
   return <div className="page">{modal&&<SaleModal close={()=>setModal(false)}/>}
     <div className="page-lead"><div><h2>Vendas</h2><p>Consulta, edição e exportação dos registros reais.</p></div><div className="page-actions"><PeriodFilter value={period} onApply={setPeriod}/><button onClick={()=>exportCsv('vendas-ruah.csv',sales as unknown as Record<string,unknown>[])}><Download size={17}/> Exportar CSV</button><button className="primary" onClick={()=>setModal(true)}><Plus size={17}/> Nova venda</button></div></div>
-    <div className="toolbar card sales-filters"><div className="search"><Search size={18}/><input value={filters.search??''} onChange={(event)=>setFilter('search',event.target.value)} placeholder="Cliente, perfume ou observação…"/></div>
-      <input value={filters.client??''} onChange={(event)=>setFilter('client',event.target.value)} placeholder="Cliente"/>
-      <input value={filters.perfume??''} onChange={(event)=>setFilter('perfume',event.target.value)} placeholder="Perfume"/>
-      <select value={filters.type??''} onChange={(event)=>setFilter('type',event.target.value)}><option value="">APC e SPLIT</option><option>APC</option><option>SPLIT</option></select>
-      <input inputMode="decimal" value={filters.volumeMl??''} onChange={(event)=>setFilters((current)=>({...current,volumeMl:event.target.value?Number(event.target.value):undefined}))} placeholder="ML"/>
-      <select value={filters.status??''} onChange={(event)=>setFilter('status',event.target.value)}><option value="">Todos os pagamentos</option><option value="paid">Pago</option><option value="pending">Aguardando</option><option value="cancelled">Cancelado</option><option value="unknown">Revisão</option></select>
-      <select value={filters.method??''} onChange={(event)=>setFilter('method',event.target.value)}><option value="">Todas as formas</option><option>PIX</option><option>CARTÃO</option><option>DEPÓSITO</option></select>
-      <select value={filters.origin??''} onChange={(event)=>setFilter('origin',event.target.value)}><option value="">Todas as origens</option><option value="spreadsheet">Importação</option><option value="manual">Manual</option></select>
-      <input inputMode="decimal" value={filters.minValue??''} onChange={(event)=>setFilters((current)=>({...current,minValue:event.target.value?Number(event.target.value):undefined}))} placeholder="Valor mínimo"/>
-      <input inputMode="decimal" value={filters.maxValue??''} onChange={(event)=>setFilters((current)=>({...current,maxValue:event.target.value?Number(event.target.value):undefined}))} placeholder="Valor máximo"/>
-      <select value={filters.sort??''} onChange={(event)=>setFilter('sort',event.target.value)}><option value="sale_date_desc">Data mais recente</option><option value="sale_date_asc">Data mais antiga</option><option value="amount_desc">Maior valor</option><option value="client_name_raw_asc">Cliente</option><option value="perfume_name_raw_asc">Perfume</option></select></div>
+    <div className="sales-filter-panel card">
+      <div className="filter-primary"><div className="search"><Search size={18}/><input value={filters.search??''} onChange={(event)=>setFilter('search',event.target.value)} placeholder="Buscar cliente, perfume ou observação…"/></div>
+        <select value={filters.status??''} onChange={(event)=>setFilter('status',event.target.value)}><option value="">Todos os pagamentos</option><option value="paid">Pago</option><option value="pending">Aguardando</option><option value="cancelled">Cancelado</option><option value="unknown">Revisão</option></select>
+        <select value={filters.sort??''} onChange={(event)=>setFilter('sort',event.target.value)}><option value="sale_date_desc">Mais recentes</option><option value="sale_date_asc">Mais antigas</option><option value="amount_desc">Maior valor</option><option value="client_name_raw_asc">Cliente A–Z</option><option value="perfume_name_raw_asc">Perfume A–Z</option></select>
+        <button className={showMoreFilters?'filter-toggle active':'filter-toggle'} onClick={()=>setShowMoreFilters(!showMoreFilters)}><SlidersHorizontal/> Mais filtros {activeFilterCount>0&&<i>{activeFilterCount}</i>}</button>
+        {activeFilterCount>0&&<button className="filter-clear" onClick={clearFilters}><RotateCcw/> Limpar</button>}
+      </div>
+      {showMoreFilters&&<div className="filter-secondary">
+        <label><span>Cliente</span><input value={filters.client??''} onChange={(event)=>setFilter('client',event.target.value)} placeholder="Nome do cliente"/></label>
+        <label><span>Perfume</span><input value={filters.perfume??''} onChange={(event)=>setFilter('perfume',event.target.value)} placeholder="Nome do perfume"/></label>
+        <label><span>Tipo</span><select value={filters.type??''} onChange={(event)=>setFilter('type',event.target.value)}><option value="">Todos</option><option>APC</option><option>SPLIT</option></select></label>
+        <label><span>Volume</span><input inputMode="decimal" value={filters.volumeMl??''} onChange={(event)=>setFilters((current)=>({...current,volumeMl:event.target.value?Number(event.target.value):undefined}))} placeholder="ML"/></label>
+        <label><span>Forma de pagamento</span><select value={filters.method??''} onChange={(event)=>setFilter('method',event.target.value)}><option value="">Todas</option><option>PIX</option><option>CARTÃO</option><option>DEPÓSITO</option></select></label>
+        <label><span>Origem</span><select value={filters.origin??''} onChange={(event)=>setFilter('origin',event.target.value)}><option value="">Todas</option><option value="spreadsheet">Importação</option><option value="manual">Manual</option></select></label>
+        <label><span>Valor mínimo</span><input inputMode="decimal" value={filters.minValue??''} onChange={(event)=>setFilters((current)=>({...current,minValue:event.target.value?Number(event.target.value):undefined}))} placeholder="R$ 0,00"/></label>
+        <label><span>Valor máximo</span><input inputMode="decimal" value={filters.maxValue??''} onChange={(event)=>setFilters((current)=>({...current,maxValue:event.target.value?Number(event.target.value):undefined}))} placeholder="Sem limite"/></label>
+      </div>}
+    </div>
     {loading?<div className="empty card"><h3>Carregando vendas…</h3></div>:error?<div className="notice"><AlertTriangle size={18}/><span>{error}</span></div>:
     <div className="card clients-table"><div className="clients-caption"><div><strong>{integer(count)} vendas filtradas</strong><span>{brl(total)} nesta página</span></div><span className="live-dot">SUPABASE</span></div>
       <div className="table-wrap"><table><thead><tr><th>Data</th><th>Cliente</th><th>Perfume</th><th>Tipo</th><th>ML</th><th>Valor</th><th>Pagamento</th><th>Forma</th><th>Data pagmt.</th><th>Prazo</th><th>Data envio</th><th>Entrega</th><th>Origem</th><th>Ações</th></tr></thead>
